@@ -1111,7 +1111,7 @@ function getUserTimeZone() {
 			checkTz=$(echo $TimeZone | cut -d'/' -f 1)
 			[[ -n "$checkTz" && "$checkTz" =~ ^[a-zA-Z] ]] && break
 		done
-		[[ -z "$TimeZone" ]] && TimeZone="Asia/Tokyo"
+		[[ -z "$TimeZone" ]] && TimeZone="Asia/Jakarta"
 	else
 		echo $(timedatectl list-timezones) >>"$1"
 		[[ $(grep -c "$TimeZone" "$1") == "0" || ! "/usr/share/zoneinfo/$1" ]] && TimeZone="Asia/Tokyo"
