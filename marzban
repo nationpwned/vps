@@ -1005,6 +1005,7 @@ install_command() {
     fi
     install_completion
     up_marzban
+    follow_marzban_logs
 }
 
 install_yq() {
