@@ -1004,8 +1004,6 @@ install_command() {
         exit 1
     fi
     install_completion
-    up_marzban
-    follow_marzban_logs
 }
 
 install_yq() {
