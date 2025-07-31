@@ -96,12 +96,12 @@ else
     chmod 644 "/var/lib/marzban/certs/fullchain.pem"
 fi
 
-wget -O /opt/marzban/.env https://github.com/nationpwned/mz/raw/refs/heads/main/env
+wget -O /opt/marzban/.env https://github.com/nationpwned/mz/raw/refs/heads/next/env
 # Download docker-compose.yml
-wget -O /opt/marzban/docker-compose.yml https://github.com/nationpwned/mz/raw/refs/heads/main/docker-compose.yml
+wget -O /opt/marzban/docker-compose.yml https://github.com/nationpwned/mz/raw/refs/heads/next/docker-compose.yml
 
 # Download nginx.conf
-wget -O /opt/marzban/nginx.conf https://raw.githubusercontent.com/nationpwned/mz/refs/heads/main/nginx.conf
+wget -O /opt/marzban/nginx.conf https://github.com/nationpwned/mz/raw/refs/heads/next/nginx.confhttps://raw.githubusercontent.com/nationpwned/mz/refs/heads/main/nginx.conf
 # Replace placeholders in nginx.conf with user input
 sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzban/nginx.conf
 
