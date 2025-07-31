@@ -86,9 +86,9 @@ if [[ -f "/var/lib/marzban/certs/fullchain.pem" && -f "/var/lib/marzban/certs/ke
     echo "SSL certificate already exists. Skipping certificate installation."
 else
     # Install Certificate using acme.sh
-    su -c "curl https://get.acme.sh | sh -s email=$MAIL"
+    curl https://get.acme.sh | sh -s email=$MAIL
     mkdir -p /var/lib/marzban/certs
-    su -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzban/certs/fullchain.pem\" --key-file \"/var/lib/marzban/certs/key.pem\""
+    ~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzban/certs/fullchain.pem\" --key-file \"/var/lib/marzban/certs/key.pem\"
     marzban down
 
     # Set proper permissions
