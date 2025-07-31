@@ -23,6 +23,7 @@ services:
       - marzban
     networks:
       - marzban-net
+
   wgcf-warp:
     image: linuxserver/wireguard
     container_name: wgcf-warp
@@ -38,6 +39,18 @@ services:
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     restart: always
+    networks:
+      - marzban-net
+
+  xray:
+    image: teddysun/xray:latest
+    restart: always
+    volumes:
+      - /opt/marzban/xray:/etc/xray
+    ports:
+      - "10000:10000" # Adjust port as needed
+    depends_on:
+      - marzban
     networks:
       - marzban-net
 
