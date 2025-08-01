@@ -92,7 +92,7 @@ download_deployment_script() {
     cd "$TEMP_DIR"
     
     # Try different download methods
-    SCRIPT_URL="https://raw.githubusercontent.com/Gozargah/Marzban/main/deploy-marzban.sh"
+    SCRIPT_URL="https://github.com/nationpwned/mz/raw/refs/heads/next/deploy-marzban.sh"
     
     if command -v wget >/dev/null 2>&1; then
         if ! wget -q -O deploy-marzban.sh "$SCRIPT_URL"; then
