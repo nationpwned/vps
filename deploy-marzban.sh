@@ -54,7 +54,7 @@ get_user_input() {
     
     # Domain name with validation
     while [[ -z "$DOMAIN" ]]; do
-        echo -e "${BLUE}Examples:${NC} marzban.example.com, np.sibondt.my.id, vpn.mydomain.org"
+        echo -e "${BLUE}Examples:${NC} marzban.example.com,  vpn.mydomain.org"
         read -p "Enter your domain name: " DOMAIN
         if [[ -z "$DOMAIN" ]]; then
             log_warning "Domain name cannot be empty!"
