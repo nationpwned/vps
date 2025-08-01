@@ -1,5 +1,5 @@
 
-- wget https://github.com/nationpwned/mz/raw/refs/heads/main/install.sh
+- curl -fsSL https://github.com/nationpwned/mz/raw/refs/heads/next/install.sh -o install.sh
 - chmod +x install.sh
 - sudo ./install.sh
 
