@@ -226,7 +226,7 @@ install_dependencies() {
         # Copy to system location - check multiple possible locations
         UV_BINARY=""
         if [[ -f "$HOME/.local/bin/uv" ]]; then
-            UV_BINARY="$HOME/.local/bin/uv
+            UV_BINARY="$HOME/.local/bin/uv"
         elif [[ -f "$HOME/.cargo/bin/uv" ]]; then
             UV_BINARY="$HOME/.cargo/bin/uv"
         else
@@ -323,13 +323,15 @@ install_dependencies() {
         log_info "Installing Nginx..."
         apt install -y nginx
         systemctl enable nginx
+        systemctl stop nginx > /dev/null 2>&1 || true
     fi
     
     log_success "Dependencies installed successfully"
 }
 
-install_certificat() {
+install_certificate() {
     log_info "Installing SSL certificates..."
+    mkdir -p /opt/marzban/certs
     curl https://get.acme.sh | sh -s email="$EMAIL" && source ~/.bashrc
 
     ~/.acme.sh/acme.sh \
@@ -624,12 +626,11 @@ setup_ssl() {
     log_info "Setting up SSL certificate..."
     
     # Stop nginx temporarily
-    systemctl stop nginx
+    systemctl stop nginx > /dev/null 2>&1 || true
     
         # Start nginx
-    systemctl start nginx
-    
-    
+    systemctl start nginx > /dev/null 2>&1 || true
+
     log_success "SSL certificate installed and auto-renewal configured"
 }
 
@@ -651,8 +652,8 @@ server {
     server_name $DOMAIN;
     
     # SSL Configuration (will be configured by Certbot)
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_certificate /opt/marzban/certs/fullchain.pem;
+    ssl_certificate_key /opt/marzban/certs/privkey.pem;
     
     # Security headers
     add_header X-Frame-Options DENY;
@@ -679,18 +680,6 @@ server {
         proxy_read_timeout 60s;
     }
     
-    # WebSocket support
-    location /ws {
-        proxy_pass http://127.0.0.1:$MARZBAN_PORT;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-    
     # VLESS WS TLS
     location /vless-ws {
         proxy_pass https://127.0.0.1:2021;
@@ -703,7 +692,7 @@ server {
 
     # TROJAN WS TLS
     location /trojan-ws {
-        proxy_pass https://127.0.0.1:2023;
+        proxy_pass https://127.0.0.1:2022;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -716,7 +705,7 @@ server {
         if (\$http_content_type != "application/grpc") {
             return 404;
         }
-        grpc_pass grpcs://127.0.0.1:2022;
+        grpc_pass grpcs://127.0.0.1:2023;
         grpc_set_header Host \$host;
         grpc_ssl_verify off;
     }
@@ -819,8 +808,8 @@ start_services() {
     
     # Start and enable services
     systemctl start marzban
-    systemctl reload nginx
-    
+    systemctl reload nginx > /dev/null 2>&1 || true
+
     # Check status
     if systemctl is-active --quiet marzban; then
         log_success "Marzban service started successfully"
