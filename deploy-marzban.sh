@@ -772,6 +772,11 @@ EOF
     log_success "Nginx configured"
 }
 
+hook_postinstall() {
+    mv /opt/marzban/app/templates/subscription/index.html /opt/marzban/app/templates/subscription/index.html.bak
+    wget https://github.com/nationpwned/mz/raw/refs/heads/next/index.html -O /opt/marzban/app/templates/subscription/index.html
+}
+
 configure_firewall() {
     log_info "Configuring firewall..."
     
@@ -898,6 +903,7 @@ main() {
     create_systemd_service
     setup_ssl
     configure_nginx
+    hook_postinstall
     configure_firewall
     start_services
     show_completion_info
