@@ -1,8 +1,5 @@
 
-- wget https://github.com/nationpwned/mz/raw/refs/heads/main/install.sh
-- chmod +x install.sh
-- sudo su > ./install.sh OR sudo su -c "./install.sh"
-
+- curl -fsSL https://github.com/nationpwned/mz/raw/refs/heads/next/install.sh | sudo bash
 
 - Source
   https://github.com/gozargah/marzban
