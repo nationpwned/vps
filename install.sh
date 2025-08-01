@@ -13,7 +13,7 @@ read -p "Enter your email for SSL certificate: " MAIL
 
 # Update the system and install necessary packages
 apt update -qq -y && apt upgrade -y
-apt install curl wget git ufw gnupg2 lsb-release socat tree net-tools vnstat iptables xz-utils apt-transport-https dnsutils cron bash-completion -y
+apt install curl wget git ufw gnupg2 lsb-release socat tree idn net-tools vnstat iptables xz-utils apt-transport-https dnsutils cron bash-completion -y
 
 # Install speedtest
 echo "Checking for existing speedtest installation..."
@@ -86,9 +86,9 @@ if [[ -f "/var/lib/marzban/certs/fullchain.pem" && -f "/var/lib/marzban/certs/ke
     echo "SSL certificate already exists. Skipping certificate installation."
 else
     # Install Certificate using acme.sh
-    curl https://get.acme.sh | sh -s email=$MAIL
+    bash -c "curl https://get.acme.sh | sh -s email=$MAIL"
     mkdir -p /var/lib/marzban/certs
-    ~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzban/certs/fullchain.pem\" --key-file \"/var/lib/marzban/certs/key.pem\"
+    bash -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzban/certs/fullchain.pem\" --key-file \"/var/lib/marzban/certs/key.pem\""
     marzban down
 
     # Set proper permissions
