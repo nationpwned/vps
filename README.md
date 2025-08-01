@@ -1,7 +1,7 @@
 
 - wget https://github.com/nationpwned/mz/raw/refs/heads/main/install.sh
 - chmod +x install.sh
-- sudo su > ./install.sh OR sudo su -c "./install.sh"
+- sudo ./install.sh
 
 
 - Source
