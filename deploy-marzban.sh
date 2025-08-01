@@ -3,7 +3,7 @@
 #==========================================
 # Marzban VPS Deployment Script
 # Version: 1.0
-# Author: GitHub Copilot
+# Author: @sib0ndt
 # Description: Complete Marzban deployment with SSL and Nginx
 #==========================================
 
@@ -202,9 +202,13 @@ update_system() {
 
 install_dependencies() {
     log_info "Installing dependencies..."
+
+    # Install Xray
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+    log_success "Xray installed successfully"
     
     # Install basic packages
-    apt install -y curl wget git unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release
+    apt install -y cron curl wget git unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release socat tree dns-tools
     
     # Install Python 3.11+ (if not available, install from deadsnakes PPA)
     if ! python3.11 --version >/dev/null 2>&1; then
@@ -324,23 +328,14 @@ install_dependencies() {
     log_success "Dependencies installed successfully"
 }
 
-install_certbot() {
-    log_info "Installing Certbot for SSL certificates..."
-    
-    # Install snapd if not present
-    if ! command -v snap >/dev/null 2>&1; then
-        apt install -y snapd
-        systemctl enable snapd
-        systemctl start snapd
-        sleep 5
-    fi
-    
-    # Install certbot via snap
-    snap install core; snap refresh core
-    snap install --classic certbot
-    ln -sf /snap/bin/certbot /usr/bin/certbot
-    
-    log_success "Certbot installed successfully"
+install_certificat() {
+    log_info "Installing SSL certificates..."
+    curl https://get.acme.sh | sh -s email="$EMAIL" && source ~/.bashrc
+
+    ~/.acme.sh/acme.sh \
+    --issue --force --standalone -d "$DOMAIN" \
+    --fullchain-file "/opt/marzban/certs/fullchain.pem" \
+    --key-file "/opt/marzban/certs/privkey.pem"
 }
 
 create_user() {
@@ -631,23 +626,9 @@ setup_ssl() {
     # Stop nginx temporarily
     systemctl stop nginx
     
-    # Get SSL certificate
-    certbot certonly --standalone \
-        --non-interactive \
-        --agree-tos \
-        --email "$EMAIL" \
-        -d "$DOMAIN"
-    
-    mkdir -p /opt/marzban/certs
-    cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem /etc/letsencrypt/live/$DOMAIN/privkey.pem /opt/marzban/certs/
-
-    chown marzban:marzban /opt/marzban/certs/*.pem && sudo chmod 640 /opt/marzban/certs/*.pem
-
-    # Start nginx
+        # Start nginx
     systemctl start nginx
     
-    # Setup auto-renewal
-    (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet --reload") | crontab -
     
     log_success "SSL certificate installed and auto-renewal configured"
 }
@@ -775,6 +756,26 @@ EOF
 hook_postinstall() {
     mv /opt/marzban/app/templates/subscription/index.html /opt/marzban/app/templates/subscription/index.html.bak
     wget https://github.com/nationpwned/mz/raw/refs/heads/next/index.html -O /opt/marzban/app/templates/subscription/index.html
+    sudo tee /etc/systemd/system/marzban.service > /dev/null << 'EOF'
+[Unit]
+Description=Marzban VPN Management Panel
+After=network.target
+
+[Service]
+Type=simple
+User=marzban
+Group=marzban
+WorkingDirectory=/opt/marzban
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/uv run main.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
 }
 
 configure_firewall() {
@@ -895,7 +896,7 @@ main() {
     get_user_input
     update_system
     install_dependencies
-    install_certbot
+    install_certificate
     create_user
     download_marzban
     build_marzban
