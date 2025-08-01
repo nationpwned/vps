@@ -208,7 +208,7 @@ install_dependencies() {
     log_success "Xray installed successfully"
     
     # Install basic packages
-    apt install -y cron curl wget git unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release socat tree dns-tools
+    apt install -y cron curl wget git unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release socat tree net-tools
     
     # Install Python 3.11+ (if not available, install from deadsnakes PPA)
     if ! python3.11 --version >/dev/null 2>&1; then
@@ -226,7 +226,7 @@ install_dependencies() {
         # Copy to system location - check multiple possible locations
         UV_BINARY=""
         if [[ -f "$HOME/.local/bin/uv" ]]; then
-            UV_BINARY="$HOME/.local/bin/uv"
+            UV_BINARY="$HOME/.local/bin/uv
         elif [[ -f "$HOME/.cargo/bin/uv" ]]; then
             UV_BINARY="$HOME/.cargo/bin/uv"
         else
