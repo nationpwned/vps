@@ -39,15 +39,7 @@
       },
       "streamSettings": {
         "network": "ws",
-        "security": "tls",
-        "tlsSettings": {
-          "certificates": [
-            {
-              "certificateFile": "/opt/marzban/certs/fullchain.pem",
-              "keyFile": "/opt/marzban/certs/privkey.pem"
-            }
-          ]
-        },
+        "security": "none",
         "wsSettings": {
           "path": "/vless-ws"
         }
@@ -63,15 +55,7 @@
       },
       "streamSettings": {
         "network": "grpc",
-        "security": "tls",
-        "tlsSettings": {
-          "certificates": [
-            {
-              "certificateFile": "/opt/marzban/certs/fullchain.pem",
-              "keyFile": "/opt/marzban/certs/privkey.pem"
-            }
-          ]
-        },
+        "security": "none",
         "grpcSettings": {
           "serviceName": "vless"
         }
@@ -86,15 +70,7 @@
       },
       "streamSettings": {
         "network": "ws",
-        "security": "tls",
-        "tlsSettings": {
-          "certificates": [
-            {
-              "certificateFile": "/opt/marzban/certs/fullchain.pem",
-              "keyFile": "/opt/marzban/certs/privkey.pem"
-            }
-          ]
-        },
+        "security": "none",
         "wsSettings": {
           "path": "/trojan-ws"
         }
@@ -109,15 +85,7 @@
       },
       "streamSettings": {
         "network": "grpc",
-        "security": "tls",
-        "tlsSettings": {
-          "certificates": [
-            {
-              "certificateFile": "/opt/marzban/certs/fullchain.pem",
-              "keyFile": "/opt/marzban/certs/privkey.pem"
-            }
-          ]
-        },
+        "security": "none",
         "grpcSettings": {
           "serviceName": "trojan"
         }
