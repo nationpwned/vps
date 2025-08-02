@@ -782,10 +782,13 @@ configure_firewall() {
     ufw default deny incoming
     ufw default allow outgoing
     
+    # Firewall configuration
+    echo "Configuring firewall..."
     ufw allow 8000/tcp
     ufw allow 80/tcp
     ufw allow 443/tcp
     ufw allow 22/tcp
+    ufw allow 2222/tcp
     ufw allow 2021/tcp
     ufw allow 2022/tcp
     ufw allow 2023/tcp
@@ -796,8 +799,11 @@ configure_firewall() {
     ufw allow 51823/tcp
     ufw allow 51824/tcp
     ufw allow 51825/tcp
+    ufw allow 8443/tcp
+    ufw allow 9443/tcp
+    ufw allow 62050/tcp
+    ufw allow 62051/tcp
     
-    # Enable firewall
     ufw --force enable
     
     log_success "Firewall configured"
