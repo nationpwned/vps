@@ -4,7 +4,6 @@
   
 - chmod +x install.sh
 - sudo su -c "./install.sh"
-- 
 - Source
-  [[https://github.com/gozargah/marzban](https://remna.st/docs/overview/introduction)](https://remna.st/docs/overview/introduction)
+https://remna.st/docs/overview/introduction
 
