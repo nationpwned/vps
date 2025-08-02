@@ -114,7 +114,6 @@ sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzban/xray_config.json
 mkdir -p /var/lib/marzban/templates/subscription/
 wget -N -P /var/lib/marzban/templates/subscription/ https://github.com/nationpwned/mz/raw/refs/heads/main/index.html
 
-ufw --force enable
 # Firewall configuration
 echo "Configuring firewall..."
 ufw allow 8000/tcp
