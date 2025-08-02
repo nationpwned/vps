@@ -1,202 +1,182 @@
 #!/bin/bash
 
-set -e
-# Ensure running as root
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root (e.g., with sudo su)" >&2
-  exit 1
-fi
-# Define the domain for your Marzban instance
-read -p "Enter your domain for Marzban: " DOMAIN
-read -p "Enter your email for SSL certificate: " MAIL
+# Set up Nginx with SSL for Remnawave and subscription page using acme.sh
 
+# Install dependencies
+apt-get update
+apt-get install -y cron socat tree net-tools
 
-# Update the system and install necessary packages
-apt update -qq -y && apt upgrade -y
-apt install curl wget git ufw gnupg2 lsb-release socat tree idn net-tools vnstat iptables xz-utils apt-transport-https dnsutils cron bash-completion -y
+read -p "Enter your domain: " DOMAIN
+read -p "Enter your mail for SSL certificate 3dxeooovgg@vwhins.com: " MAIL
 
-# Install speedtest
-echo "Checking for existing speedtest installation..."
-if command -v speedtest >/dev/null 2>&1; then
-    echo "speedtest is already installed. Skipping installation."
-else
-    echo "Installing speedtest..."
-    wget -q https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-x86_64.tgz > /dev/null 2>&1
-    tar xzf ookla-speedtest-1.2.0-linux-x86_64.tgz > /dev/null 2>&1
-    mv speedtest /usr/bin/
-    rm -f ookla-* speedtest.* > /dev/null 2>&1
-fi
+# Install Remnawave
+bash <(curl -Ls https://github.com/DigneZzZ/remnawave-scripts/raw/main/remnawave.sh) @ install-script
 
-# Enable BBR
-echo "Enabling BBR congestion control..."
-modprobe tcp_bbr >/dev/null 2>&1
-echo "tcp_bbr" | tee -a /etc/modules-load.d/modules.conf
-sysctl -w net.core.default_qdisc=fq
-sysctl -w net.ipv4.tcp_congestion_control=bbr
-if sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
-  echo "BBR has been enabled."
-else
-  echo "Failed to enable BBR."
-fi
-sysctl -p >/dev/null 2>&1
+# Install Remnawave
+remnawave install
+remnawave down
 
-rm -Rf /opt/marzban >/dev/null 2>&1 || true
-# Install Marzban
-marzban down >/dev/null 2>&1 || true
+# Stop Remnawave
+cd /opt/remnawave   
+docker compose down > /dev/null 2>&1 || true
+pkill -f remnawave > /dev/null 2>&1 || true
 
-rm -Rf /opt/marzban >/dev/null 2>&1 || true
-rm -Rf /var/lib/marzban >/dev/null 2>&1 || true
+# Install acme.sh
+curl https://get.acme.sh | sh -s email=$MAIL
+source ~/.bashrc
 
-bash -c "$(curl -sL https://github.com/nationpwned/mz/raw/refs/heads/main/marzban)" @ install
-sleep 50
+# Create Nginx directory
+mkdir -p /opt/remnawave/nginx
+cd /opt/remnawave/nginx
 
-marzban cli admin create --sudo
+# Issue SSL certificates
+/root/.acme.sh/acme.sh --issue --force --standalone -d $DOMAIN --key-file /opt/remnawave/nginx/privkey.key --fullchain-file /opt/remnawave/nginx/fullchain.pem --alpn --tlsport 8443
+/root/.acme.sh/acme.sh --issue --force --standalone -d $SUBDOMAIN --key-file /opt/remnawave/nginx/subdomain_privkey.key --fullchain-file /opt/remnawave/nginx/subdomain_fullchain.pem --alpn --tlsport 8443
 
-[ -f /$HOME/reality.txt ] && rm -f /$HOME/reality.txt
-[ -f /$HOME/shortIds.txt ] && rm -f /$HOME/shortIds.txt
-[ -f /$HOME/xray_uuid.txt ] && rm -f /$HOME/xray_uuid.txt
+# Create Nginx configuration
+cat > /opt/remnawave/nginx/nginx.conf <<EOF
+upstream remnawave {
+    server remnawave:3000;
+}
 
-# Generate Reality keys
-echo "Generating Reality keys..."
-docker exec marzban-marzban-1 xray x25519 genkey > /$HOME/reality.txt
-PRIVATE_KEY=$(grep -oP 'Private key: \K\S+' /$HOME/reality.txt)
-PUBLIC_KEY=$(grep -oP 'Public key: \K\S+' /$HOME/reality.txt)
+upstream remnawave-subscription-page {
+    server remnawave-subscription-page:3010;
+}
 
-# Generate shortIds
-echo "Generating shortIds..."
-openssl rand -hex 8 > /$HOME/shortIds.txt
-SHORTIDS=$(cat /$HOME/shortIds.txt)
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    "" close;
+}
 
-# Generating uuid for Reality
-echo "Generating UUID for Reality..."
-if ! docker ps | grep -q marzban-marzban-1; then
-  echo "Marzban container not running! Exiting."
-  exit 1
-fi
-docker exec marzban-marzban-1 xray uuid > /$HOME/xray_uuid.txt
-XRAY_UUID=$(cat /$HOME/xray_uuid.txt)
-if [[ -z "$XRAY_UUID" ]]; then
-  echo "Failed to generate UUID. Exiting."
-  exit 1
-fi
+server {
+    server_name $DOMAIN;
+    listen 443 ssl reuseport;
+    listen [::]:443 ssl reuseport;
+    http2 on;
 
-# Check if certificate already exists
-rm -Rf /var/lib/marzban/certs >/dev/null 2>&1 || true
-if [[ -f "/var/lib/marzban/certs/fullchain.pem" && -f "/var/lib/marzban/certs/key.pem" ]]; then
-    echo "SSL certificate already exists. Skipping certificate installation."
-else
-    # Install Certificate using acme.sh
-    bash -c "curl https://get.acme.sh | sh -s email=$MAIL"
-    mkdir -p /var/lib/marzban/certs
-    bash -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzban/certs/fullchain.pem\" --key-file \"/var/lib/marzban/certs/key.pem\""
-    marzban down
+    location / {
+        # Handle gRPC requests
+        if ($is_grpc) {
+            grpc_pass grpc://remnawave;
+            grpc_set_header Host $host;
+            grpc_set_header X-Real-IP $remote_addr;
+            grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            grpc_set_header X-Forwarded-Proto $scheme;
+        }
 
-    # Set proper permissions
-    chmod 600 "/var/lib/marzban/certs/key.pem"
-    chmod 644 "/var/lib/marzban/certs/fullchain.pem"
-fi
+        # Handle WebSocket and HTTP requests
+        proxy_http_version 1.1;
+        proxy_pass http://remnawave;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
-wget -O /opt/marzban/.env https://github.com/nationpwned/mz/raw/refs/heads/main/env
-# Download docker-compose.yml
-wget -O /opt/marzban/docker-compose.yml https://github.com/nationpwned/mz/raw/refs/heads/main/docker-compose.yml
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;
+    ssl_session_tickets off;
+    ssl_certificate "/etc/nginx/ssl/fullchain.pem";
+    ssl_certificate_key "/etc/nginx/ssl/privkey.key";
+    ssl_trusted_certificate "/etc/nginx/ssl/fullchain.pem";
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 208.67.222.222 208.67.220.220 valid=60s;
+    resolver_timeout 2s;
 
-# Download nginx.conf
-wget -O /opt/marzban/nginx.conf https://raw.githubusercontent.com/nationpwned/mz/refs/heads/main/nginx.conf
-# Replace placeholders in nginx.conf with user input
-sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzban/nginx.conf
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+    gzip_min_length 256;
+    gzip_types application/atom+xml application/geo+json application/javascript application/x-javascript application/json application/ld+json application/manifest+json application/rdf+xml application/rss+xml application/xhtml+xml application/xml font/eot font/otf font/ttf image/svg+xml text/css text/javascript text/plain text/xml;
+}
 
-# Download xray_config.json
-wget -O /var/lib/marzban/xray_config.json https://github.com/nationpwned/mz/raw/refs/heads/main/xray_config.json
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
 
-sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzban/xray_config.json
+server {
+    server_name $SUBDOMAIN;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
 
-# Download the subscribers Marzban
-mkdir -p /var/lib/marzban/templates/subscription/
-wget -N -P /var/lib/marzban/templates/subscription/ https://github.com/nationpwned/mz/raw/refs/heads/main/index.html
+    location / {
+        proxy_http_version 1.1;
+        proxy_pass http://remnawave-subscription-page;
+        proxy_set_header Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
 
-# Firewall configuration
-echo "Configuring firewall..."
-ufw allow 8000/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw allow 22/tcp
-ufw allow 2222/tcp
-ufw allow 2021/tcp
-ufw allow 2022/tcp
-ufw allow 2023/tcp
-ufw allow 2024/tcp
-ufw allow 51820/tcp
-ufw allow 51821/tcp
-ufw allow 51822/tcp
-ufw allow 51823/tcp
-ufw allow 51824/tcp
-ufw allow 51825/tcp
-ufw allow 8443/tcp
-ufw allow 9443/tcp
-ufw allow 62050/tcp
-ufw allow 62051/tcp
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;
+    ssl_session_tickets off;
+    ssl_certificate "/etc/nginx/ssl/subdomain_fullchain.pem";
+    ssl_certificate_key "/etc/nginx/ssl/subdomain_privkey.key";
+    ssl_trusted_certificate "/etc/nginx/ssl/subdomain_fullchain.pem";
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 208.67.222.222 208.67.220.220 valid=60s;
+    resolver_timeout 2s;
 
-ufw --force enable
+    proxy_hide_header Strict-Transport-Security;
+    add_header Strict-Transport-Security "max-age=15552000" always;
 
-# Cloudflare Warp installation
-echo "Installing Cloudflare Warp..."
-docker compose -f /opt/marzban/docker-compose.yml up -d
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+    gzip_min_length 256;
+    gzip_types application/atom+xml application/geo+json application/javascript application/x-javascript application/json application/ld+json application/manifest+json application/rdf+xml application/rss+xml application/xhtml+xml application/xml font/eot font/otf font/ttf image/svg+xml text/css text/javascript text/plain text/xml;
+}
+EOF
 
-# Ensure /opt/marzban/wgcf directory is fresh
-if [ -d /opt/marzban/wgcf ]; then
-  rm -rf /opt/marzban/wgcf
-fi
-mkdir -p /opt/marzban/wgcf
+# Create Docker Compose configuration
+cat > /opt/remnawave/nginx/docker-compose.yml <<EOF
+services:
+    remnawave-nginx:
+        image: nginx:1.26
+        container_name: remnawave-nginx
+        hostname: remnawave-nginx
+        volumes:
+            - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+            - ./fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+            - ./privkey.key:/etc/nginx/ssl/privkey.key:ro
+            - ./subdomain_fullchain.pem:/etc/nginx/ssl/subdomain_fullchain.pem:ro
+            - ./subdomain_privkey.key:/etc/nginx/ssl/subdomain_privkey.key:ro
+        restart: always
+        ports:
+            - '0.0.0.0:443:443'
+        networks:
+            - remnawave-network
 
-# Download wgcf binary
-WGCF_LATEST_URL=$(curl -s https://api.github.com/repos/ViRb3/wgcf/releases/latest | grep "browser_download_url" | grep "linux_amd64" | cut -d '"' -f 4)
-wget "$WGCF_LATEST_URL" -O /usr/local/bin/wgcf
+networks:
+    remnawave-network:
+        name: remnawave-network
+        driver: bridge
+        external: true
+EOF
 
-chmod +x /usr/local/bin/wgcf
-# Configure Cloudflare Warp
-echo "Configuring Cloudflare Warp..."
-wgcf register --accept-tos
-wgcf generate
-mv wgcf-profile.conf /opt/marzban/wgcf/wg0.conf
-mv wgcf-account.toml /opt/marzban/wgcf/
-sed -i -E 's/, [0-9a-f:]+\/128//; s/, ::\/0//' /opt/marzban/wgcf/wg0.conf
-sleep 3
-docker restart wgcf-warp
-sleep 5
-
-echo "==============================================="
-# Check Cloudflare Warp status (Cloudflare and ip-api.com)
-if docker exec wgcf-warp curl -s https://www.cloudflare.com/cdn-cgi/trace | grep -q "warp=on"; then
-    echo "Cloudflare Warp is ON (Cloudflare trace)."
-else
-    echo "Cloudflare Warp is OFF (Cloudflare trace)."
-fi
-
-if docker exec wgcf-warp curl -s http://ip-api.com/json | grep -q 'Cloudflare WARP'; then
-    echo "Cloudflare Warp is ON (ip-api.com check)."
-else
-    echo "Cloudflare Warp is OFF or not detected by ip-api.com."
-fi
-
-echo "==============================================="
-echo "private key: $PRIVATE_KEY"
-echo "public key: $PUBLIC_KEY"
-echo "ShortIds: $SHORTIDS"
-echo "UUID: $XRAY_UUID"
-echo "==============================================="
-
-echo "Marzban installation and configuration completed successfully!"
-echo "You can access Marzban at https://$DOMAIN"
-echo "Make sure to configure your Xray clients with the provided Reality keys and UUID."
-echo "==============================================="
-
-
-read -p "Do you want to reboot now? [Y/n]: " answer
-answer=${answer:-Y}
-if [[ "$answer" =~ ^[Yy]$ ]]; then
-  echo "Rebooting system..."
-  reboot
-else
-  echo "Reboot cancelled. Please reboot manually if needed."
-fi
-
+cd /opt/remnawave/nginx && docker compose up -d && docker compose logs -f -t
