@@ -1,6 +1,6 @@
 
 # marzban
-- curl -fsSL https://github.com/nationpwned/mz/raw/refs/heads/main/install.sh | sudo bash
+- curl -fsSL https://github.com/nationpwned/mz/raw/refs/heads/main/install.sh
   
 - chmod +x install.sh
 - sudo su -c "./install.sh"
