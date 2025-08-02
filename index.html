@@ -351,7 +351,7 @@
                     <div class="info-item animate-fade-in delay-1">
                         <div class="info-label">Status</div>
                         <div class="info-value">
-                            <span class="status {% if user.status.value == 'active' %}active{% elif user.status.value == 'limited' %}limited{% elif user.status.value == 'expired' %}expired{% elif user.status.value == 'disabled' %}disabled{% endif %}">
+                            <span class="status {% if user.status.value == 'active' %}active{% elif user.status.value == 'limited' %}limited{% elif user.status.value == 'on_hold' %}on-hold{% elif user.status.value == 'expired' %}expired{% elif user.status.value == 'disabled' %}disabled{% endif %}">
                                 {{ user.status.value }}
                             </span>
                         </div>
@@ -374,11 +374,13 @@
                     <div class="info-item animate-fade-in delay-4">
                         <div class="info-label">Expiration</div>
                         <div class="info-value">
-                            {% if not user.expire %}
+                            {% if user.status.value == 'on_hold' %}
+                                {% if user.on_hold_timeout %}{{ user.on_hold_timeout | datetime }}{% else %}∞{% endif %}
+                            {% elif not user.expire %}
                                 ∞
                             {% else %}
-                                {% set current_timestamp = now().timestamp() %}
-                                {% set remaining_days = ((user.expire - current_timestamp) // (24 * 3600)) %}
+                                {% set current_datetime = now() %}
+                                {% set remaining_days = ((user.expire - current_datetime).days) %}
                                 <span>{{ user.expire | datetime }}</span>
                                 <span class="remaining-days">({{ remaining_days | int }} days)</span>
                             {% endif %}
@@ -386,7 +388,7 @@
                     </div>
                 </div>
 
-                {% if user.status == 'active' %}
+                {% if user.status in ('active','on_hold') %}
                 <div class="links-section animate-fade-in delay-5">
                     <h2 class="section-title">Links</h2>
                     <div class="accordion">
@@ -394,19 +396,13 @@
                         <div class="accordion-content" id="accordionContent">
                             <button class="convert-button" id="convertBtn">Convert</button>
                             <ul class="links-list">
-                                {% if user.links and user.links|length > 0 %}
-                                    {% for link in user.links %}
-                                    <li class="link-item">
-                                        <input type="text" value="{{ link }}" readonly>
-                                        <button class="copy-button" onclick="copyLink('{{ link }}', this)">Copy</button>
-                                        <button class="qr-button" data-link="{{ link }}">QR</button>
-                                    </li>
-                                    {% endfor %}
-                                {% else %}
-                                    <li class="link-item">
-                                        <p>No configuration links available.</p>
-                                    </li>
-                                {% endif %}
+                                {% for link in links %}
+                                <li class="link-item">
+                                    <input type="text" value="{{ link }}" readonly>
+                                    <button class="copy-button" onclick="copyLink('{{ link }}', this)">Copy</button>
+                                    <button class="qr-button" data-link="{{ link }}">QR</button>
+                                </li>
+                                {% endfor %}
                             </ul>
                         </div>
                     </div>
