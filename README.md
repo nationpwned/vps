@@ -1,5 +1,5 @@
 
-# marzban
+# Remnawave
 - curl -fsSL https://github.com/nationpwned/vps/raw/refs/heads/remnawave/install.sh -o install.sh
   
 - chmod +x install.sh
