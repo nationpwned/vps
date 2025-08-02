@@ -34,12 +34,7 @@
       "port": 2021,
       "protocol": "vless",
       "settings": {
-        "clients": [
-          {
-            "id": "7dbd660f-6700-49d4-a892-6e6f5d513447",
-            "flow": "xtls-rprx-vision"
-          }
-        ],
+        "clients": [],
         "decryption": "none"
       },
       "streamSettings": {
@@ -63,12 +58,7 @@
       "port": 2022,
       "protocol": "vless",
       "settings": {
-        "clients": [
-          {
-            "id": "7dbd660f-6700-49d4-a892-6e6f5d513447",
-            "flow": "xtls-rprx-vision"
-          }
-        ],
+        "clients": [],
         "decryption": "none"
       },
       "streamSettings": {
@@ -92,11 +82,7 @@
       "port": 2023,
       "protocol": "trojan",
       "settings": {
-        "clients": [
-          {
-            "password": "7dbd660f-6700-49d4-a892-6e6f5d513447"
-          }
-        ]
+        "clients": []
       },
       "streamSettings": {
         "network": "ws",
@@ -119,11 +105,7 @@
       "port": 2024,
       "protocol": "trojan",
       "settings": {
-        "clients": [
-          {
-            "password": "7dbd660f-6700-49d4-a892-6e6f5d513447"
-          }
-        ]
+        "clients": []
       },
       "streamSettings": {
         "network": "grpc",
