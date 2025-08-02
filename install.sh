@@ -133,6 +133,8 @@ ufw allow 51824/tcp
 ufw allow 51825/tcp
 ufw allow 8443/tcp
 ufw allow 9443/tcp
+ufw allow 62050/tcp
+ufw allow 62051/tcp
 
 ufw --force enable
 
