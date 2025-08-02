@@ -120,6 +120,7 @@ ufw allow 8000/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 22/tcp
+ufw allow 2222/tcp
 ufw allow 2021/tcp
 ufw allow 2022/tcp
 ufw allow 2023/tcp
@@ -130,6 +131,8 @@ ufw allow 51822/tcp
 ufw allow 51823/tcp
 ufw allow 51824/tcp
 ufw allow 51825/tcp
+ufw allow 8443/tcp
+ufw allow 9443/tcp
 
 ufw --force enable
 
