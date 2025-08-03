@@ -1,5 +1,5 @@
 
-# Cloudflare worker VLESS GRPC
+# Cloudflare worker VLESS TROJAN GRPC
 - curl -fsSL https://github.com/nationpwned/vps/raw/refs/heads/worker/install.sh -o install.sh
   
 - chmod +x install.sh
