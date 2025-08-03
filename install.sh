@@ -8,7 +8,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 # Define the domain for your Marzban instance
 read -p "Enter your domain for Marzban: " DOMAIN
-read -p "Enter your email for SSL certificate: " MAIL
+read -p "Enter your email for SSL certificate (inibudi@daouse.com): " MAIL
 
 
 # Update the system and install necessary packages
