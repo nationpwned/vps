@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-MARZBAN_VERSION="v1.0.0-beta-2"
+MARZBAN_VERSION="v1.0.0-beta-3"
 MARZBAN_DIR="/opt/marzban"
 MARZBAN_USER="marzban"
 NGINX_AVAILABLE="/etc/nginx/sites-available"
