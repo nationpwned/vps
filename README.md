@@ -1,9 +1,8 @@
 
 # Remnawave
-- curl -fsSL https://github.com/nationpwned/vps/raw/refs/heads/remnawave/install.sh -o install.sh
+- curl -fsSL https://github.com/nationpwned/vps/raw/refs/heads/worker/install.sh -o install.sh
   
 - chmod +x install.sh
 - sudo su -c "./install.sh"
-- Source
-https://remna.st/docs/overview/introduction
 
+- Create worker in cloudflare with provided worker.js, dont forget to change the domain...
