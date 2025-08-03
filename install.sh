@@ -198,6 +198,7 @@ systemctl restart xray nginx
 if systemctl is-active --quiet xray && systemctl is-active --quiet nginx; then
     echo "Xray and Nginx have been configured and started successfully."
     echo "vless://1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1@$DOMAIN:443?encryption=none&security=tls&type=grpc&serviceName=vless-service&sni=$DOMAIN#vless-grpc"
+    echo "trojan://1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1@$DOMAIN:443?encryption=none&security=tls&type=grpc&serviceName=trojan-service&sni=$DOMAIN#trojan-grpc"
 else
     echo "Error: Failed to start Xray or Nginx."
     exit 1
