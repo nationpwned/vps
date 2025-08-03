@@ -6,3 +6,4 @@
 - sudo su -c "./install.sh"
 
 - Create worker in cloudflare with provided worker.js, dont forget to change the domain...
+- Set subdomain to A DNS record with your VPS IP and Proxies off..
