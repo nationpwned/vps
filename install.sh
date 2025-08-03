@@ -137,6 +137,34 @@ EOF
 chown -R www-data:www-data /home/ubuntu/certs
 chmod 600 /home/ubuntu/certs/privkey.pem
 
+# Firewall configuration
+echo "Configuring firewall..."
+ufw allow 8000/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 22/tcp
+ufw allow 2222/tcp
+ufw allow 2021/tcp
+ufw allow 2022/tcp
+ufw allow 2023/tcp
+ufw allow 2024/tcp
+ufw allow 2025/tcp
+ufw allow 2026/tcp
+ufw allow 2027/tcp
+ufw allow 51820/tcp
+ufw allow 51821/tcp
+ufw allow 51822/tcp
+ufw allow 51823/tcp
+ufw allow 51824/tcp
+ufw allow 51825/tcp
+ufw allow 8443/tcp
+ufw allow 9443/tcp
+ufw allow 62050/tcp
+ufw allow 62051/tcp
+
+ufw --force enable
+
+
 # Restart services
 systemctl restart xray nginx
 
