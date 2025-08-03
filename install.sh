@@ -125,6 +125,7 @@ ufw allow 2021/tcp
 ufw allow 2022/tcp
 ufw allow 2023/tcp
 ufw allow 2024/tcp
+ufw allow 2025/tcp
 ufw allow 51820/tcp
 ufw allow 51821/tcp
 ufw allow 51822/tcp
