@@ -12,7 +12,7 @@ read -p "Enter your email for SSL certificate: " MAIL
 
 
 # Update the system and install necessary packages
-apt update -qq -y && apt upgrade -y
+apt update -qq -y
 apt install curl wget git ufw gnupg2 lsb-release socat tree idn net-tools vnstat iptables xz-utils apt-transport-https dnsutils cron bash-completion -y
 
 # Install speedtest
