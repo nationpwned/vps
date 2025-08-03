@@ -1,6 +1,7 @@
-const UUID = '1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1';
-const SERVICE_NAME = 'vless-service';
-const BACKEND_URL = 'https://YOUR-DOMAIN'; // CHANGE THIS TO YOUR DOMAIN
+const VLESS_UUID = '1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1';
+const VLESS_SERVICE_NAME = 'vless-service';
+const TROJAN_SERVICE_NAME = 'trojan-service';
+const BACKEND_URL = 'https://YOUR-DOMAIN';
 
 const uuidRegex = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i;
 
@@ -23,8 +24,8 @@ async function handleRequest(request) {
     return new Response('gRPC request required', { status: 400 });
   }
 
-  // Verify service name
-  if (!path.includes(SERVICE_NAME)) {
+  // Verify service name for either VLESS or Trojan
+  if (!path.includes(VLESS_SERVICE_NAME) && !path.includes(TROJAN_SERVICE_NAME)) {
     return new Response('Invalid gRPC service name', { status: 400 });
   }
 
@@ -44,8 +45,9 @@ async function handleRequest(request) {
 
 export default {
   async fetch(request, env, ctx) {
-    if (!validateUUID(UUID)) {
-      return new Response('Invalid UUID', { status: 400 });
+    // This UUID validation only applies to the constant, you might remove or adapt it.
+    if (!validateUUID(VLESS_UUID)) {
+      return new Response('Invalid VLESS_UUID constant in worker', { status: 400 });
     }
     return handleRequest(request);
   },
