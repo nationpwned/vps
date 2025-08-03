@@ -1,5 +1,5 @@
 
-# Remnawave
+# Cloudflare worker VLESS GRPC
 - curl -fsSL https://github.com/nationpwned/vps/raw/refs/heads/worker/install.sh -o install.sh
   
 - chmod +x install.sh
