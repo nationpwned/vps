@@ -1,3 +1,4 @@
+# Marzban Next
 
 - curl -fsSL https://github.com/nationpwned/mz/raw/refs/heads/next/install.sh -o install.sh
 - chmod +x install.sh
