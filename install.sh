@@ -39,32 +39,41 @@ fi
 
 # Configure Nginx
 cat > /etc/nginx/sites-available/vlessgrpc <<EOF
+upstream xray_grpc_backend {
+    server 127.0.0.1:2025;
+    keepalive 16;
+}
+
 server {
+    # Listen on port 443 for both IPv4 and IPv6 with HTTP/2 enabled
     listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name $DOMAIN;
 
     ssl_certificate /home/ubuntu/certs/fullchain.pem;
     ssl_certificate_key /home/ubuntu/certs/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH;
-    ssl_prefer_server_ciphers on;
+    
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_stapling on;
+    ssl_stapling_verify on;
 
+    # Location for VLESS gRPC
     location /vless-service {
-        if (\$http_content_type !~ "application/grpc") {
-            return 400;
-        }
-        grpc_pass grpc://127.0.0.1:2025;
-        grpc_set_header X-Real-IP \$remote_addr;
-        grpc_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+        grpc_pass grpc://xray_grpc_backend;
     }
 
-    location /health {
-        return 200 'OK';
-        default_type text/plain;
+    # Location for Trojan gRPC
+    location /trojan-service {
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+        grpc_pass grpc://xray_grpc_backend;
     }
 
     location / {
-        return 403;
+        return 404;
     }
 }
 EOF
@@ -118,6 +127,26 @@ cat > /usr/local/etc/xray/config.json <<EOF
           "serviceName": "vless-service"
         }
       }
+    },
+    {
+      "port": 2025,
+      "listen": "127.0.0.1",
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          {
+            "password": "ec0a721c3be5d839",
+            "level": 0
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "security": "none",
+        "grpcSettings": {
+          "serviceName": "trojan-service"
+        }
+      }
     }
   ],
   "outbounds": [
@@ -136,34 +165,6 @@ EOF
 # Set proper permissions for certificates
 chown -R www-data:www-data /home/ubuntu/certs
 chmod 600 /home/ubuntu/certs/privkey.pem
-
-# Firewall configuration
-echo "Configuring firewall..."
-ufw allow 8000/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw allow 22/tcp
-ufw allow 2222/tcp
-ufw allow 2021/tcp
-ufw allow 2022/tcp
-ufw allow 2023/tcp
-ufw allow 2024/tcp
-ufw allow 2025/tcp
-ufw allow 2026/tcp
-ufw allow 2027/tcp
-ufw allow 51820/tcp
-ufw allow 51821/tcp
-ufw allow 51822/tcp
-ufw allow 51823/tcp
-ufw allow 51824/tcp
-ufw allow 51825/tcp
-ufw allow 8443/tcp
-ufw allow 9443/tcp
-ufw allow 62050/tcp
-ufw allow 62051/tcp
-
-ufw --force enable
-
 
 # Restart services
 systemctl restart xray nginx
