@@ -337,7 +337,7 @@ install_certificate() {
     ~/.acme.sh/acme.sh \
     --issue --force --standalone -d "$DOMAIN" \
     --fullchain-file "/opt/marzban/certs/fullchain.pem" \
-    --key-file "/opt/marzban/certs/privkey.pem"
+    --key-file "/opt/marzban/certs/key.pem"
 }
 
 create_user() {
