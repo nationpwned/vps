@@ -54,7 +54,7 @@ get_user_input() {
     
     # Domain name with validation
     while [[ -z "$DOMAIN" ]]; do
-        echo -e "${BLUE}Examples:${NC} marzban.example.com,  vpn.mydomain.org"
+        echo -e "${BLUE}Examples:${NC} marzban.example.com, vpn.mydomain.org"
         read -p "Enter your domain name: " DOMAIN
         if [[ -z "$DOMAIN" ]]; then
             log_warning "Domain name cannot be empty!"
@@ -653,7 +653,7 @@ server {
     
     # SSL Configuration (will be configured by Certbot)
     ssl_certificate /opt/marzban/certs/fullchain.pem;
-    ssl_certificate_key /opt/marzban/certs/privkey.pem;
+    ssl_certificate_key /opt/marzban/certs/key.pem;
     
     # Security headers
     add_header X-Frame-Options DENY;
