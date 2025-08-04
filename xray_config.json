@@ -1,6 +1,6 @@
 {
   "log": {
-    "loglevel": "warning"
+    "loglevel": "debug"
   },
   "dns": {
     "servers": [
@@ -18,14 +18,6 @@
         "domain": [
           "geosite:category-ads-all"
         ]
-      },
-      {
-        "type": "field",
-        "outboundTag": "direct",
-        "ip": [
-          "0.0.0.0/0",
-          "::/0"
-        ]
       }
     ]
   },
@@ -39,7 +31,15 @@
       },
       "streamSettings": {
         "network": "ws",
-        "security": "none",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/opt/marzban/certs/fullchain.pem",
+              "keyFile": "/opt/marzban/certs/key.pem"
+            }
+          ]
+        },
         "wsSettings": {
           "path": "/vless-ws"
         }
@@ -55,7 +55,15 @@
       },
       "streamSettings": {
         "network": "grpc",
-        "security": "none",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/opt/marzban/certs/fullchain.pem",
+              "keyFile": "/opt/marzban/certs/key.pem"
+            }
+          ]
+        },
         "grpcSettings": {
           "serviceName": "vless"
         }
@@ -70,7 +78,15 @@
       },
       "streamSettings": {
         "network": "ws",
-        "security": "none",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/opt/marzban/certs/fullchain.pem",
+              "keyFile": "/opt/marzban/certs/key.pem"
+            }
+          ]
+        },
         "wsSettings": {
           "path": "/trojan-ws"
         }
@@ -85,7 +101,15 @@
       },
       "streamSettings": {
         "network": "grpc",
-        "security": "none",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/opt/marzban/certs/fullchain.pem",
+              "keyFile": "/opt/marzban/certs/key.pem"
+            }
+          ]
+        },
         "grpcSettings": {
           "serviceName": "trojan"
         }
