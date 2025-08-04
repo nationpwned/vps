@@ -28,11 +28,11 @@ curl https://get.acme.sh | sh -s email="$MAIL"
 ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
 ~/.acme.sh/acme.sh --issue --standalone -d "$DOMAIN" \
   --fullchain-file "/home/ubuntu/certs/fullchain.pem" \
-  --key-file "/home/ubuntu/certs/privkey.pem" \
+  --key-file "/home/ubuntu/certs/key.pem" \
   --force
 
 # Check if certificate issuance was successful
-if [ ! -f "/home/ubuntu/certs/fullchain.pem" ] || [ ! -f "/home/ubuntu/certs/privkey.pem" ]; then
+if [ ! -f "/home/ubuntu/certs/fullchain.pem" ] || [ ! -f "/home/ubuntu/certs/key.pem" ]; then
     echo "Error: Certificate issuance failed."
     exit 1
 fi
@@ -51,7 +51,7 @@ server {
     server_name $DOMAIN;
 
     ssl_certificate /home/ubuntu/certs/fullchain.pem;
-    ssl_certificate_key /home/ubuntu/certs/privkey.pem;
+    ssl_certificate_key /home/ubuntu/certs/key.pem;
     
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 1d;
@@ -164,7 +164,7 @@ EOF
 
 # Set proper permissions for certificates
 chown -R www-data:www-data /home/ubuntu/certs
-chmod 600 /home/ubuntu/certs/privkey.pem
+chmod 600 /home/ubuntu/certs/key.pem
 
 # Firewall configuration
 echo "Configuring firewall..."
