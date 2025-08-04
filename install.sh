@@ -109,7 +109,7 @@ cat > /usr/local/etc/xray/config.json <<EOF
   },
   "inbounds": [
     {
-      "port": 2025,
+      "port": 2024,
       "listen": "127.0.0.1",
       "protocol": "vless",
       "settings": {
