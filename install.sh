@@ -20,6 +20,7 @@ if [ -z "$MAIL" ]; then
     exit 1
 fi
 
+systemctl stop nginx
 # Create certificate directory
 mkdir -p /home/ubuntu/certs
 
