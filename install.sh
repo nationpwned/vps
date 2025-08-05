@@ -57,15 +57,19 @@ mkdir -p /etc/hysteria
 # Base config
 cat > /etc/hysteria/config.yaml <<EOF
 listen: :443
-
-acme:
-  domains:
-    - $DOMAIN
-  email: $EMAIL
+tls:
+  cert: /etc/letsencrypt/live/$DOMAIN/fullchain.pem
+  key: /etc/letsencrypt/live/$DOMAIN/privkey.pem
 
 auth:
   type: password
   password: $HYSTERIA_PASSWORD
+
+masquerade:
+  type: proxy
+  proxy:
+    url: https://bing.com
+    rewriteHost: true
 EOF
 
 # Add obfs to server config if password is set
@@ -77,26 +81,6 @@ obfs:
   password: $OBFS_PASSWORD
 EOF
 fi
-
-# Add masquerade
-cat >> /etc/hysteria/config.yaml <<EOF
-
-listen: :443
-
-tls:
-  cert: /etc/letsencrypt/live/$DOMAIN/fullchain.pem
-  key: /etc/letsencrypt/live/$DOMAIN/privkey.pem
-
-auth:
-  type: password
-  password: inibapakbudi
-
-masquerade:
-  type: proxy
-  proxy:
-    url: https://bing.com
-    rewriteHost: true
-EOF
 
 # --- Stop Nginx for Certificate Generation ---
 
