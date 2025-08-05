@@ -47,7 +47,7 @@ marzneshin down >/dev/null 2>&1 || true
 rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
 rm -Rf /var/lib/marzneshin >/dev/null 2>&1 || true
 
-bash -c "$(curl -sL https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/install.sh)" @ install
+bash -c "$(curl -sL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/marzneshin/marzneshin)" @ install
 sleep 50
 
 marzneshin cli admin create --sudo
