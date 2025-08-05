@@ -135,6 +135,7 @@ print_color "green" "Configuring UFW firewall..."
 echo "Configuring firewall..."
 ufw allow 8000/tcp
 ufw allow 80/tcp
+ufw allow 8080/tcp
 ufw allow 443/tcp
 ufw allow 22/tcp
 ufw allow 2222/tcp
