@@ -7,7 +7,6 @@ CONFIG_DIR="/etc/opt/$APP_NAME"
 DATA_DIR="/var/lib/$APP_NAME"
 NODE_DATA_DIR="/var/lib/$NODE_NAME"
 COMPOSE_FILE="$CONFIG_DIR/docker-compose.yml"
-
 SCRIPT_URL="https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/install.sh"
 
 colorized_echo() {
