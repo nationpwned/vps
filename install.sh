@@ -72,24 +72,17 @@ server {
     # --- Location Blocks for Routing ---
 
     # Location for VLESS gRPC service
+    # The 'if' block has been removed for simplicity. 
+    # Xray will handle any non-gRPC requests.
     location /vless-service {
-        # Ensure the request is a valid gRPC request before proxying
-        # CORRECTED: Use '!=' for exact string comparison
-        if ($content_type != "application/grpc") {
-            return 404;
-        }
         grpc_read_timeout 300s;
         grpc_send_timeout 300s;
         grpc_pass grpc://vless_grpc_backend;
     }
 
     # Location for Trojan gRPC service
+    # The 'if' block has been removed for simplicity.
     location /trojan-service {
-        # Ensure the request is a valid gRPC request before proxying
-        # CORRECTED: Use '!=' for exact string comparison
-        if ($content_type != "application/grpc") {
-            return 404;
-        }
         grpc_read_timeout 300s;
         grpc_send_timeout 300s;
         grpc_pass grpc://trojan_grpc_backend;
