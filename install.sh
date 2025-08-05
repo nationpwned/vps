@@ -54,55 +54,50 @@ upstream trojan_grpc_backend {
 
 # Main server block to handle incoming HTTPS traffic
 server {
-    # Listen on port 443 for both IPv4 and IPv6 with HTTP/2 and SSL enabled
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    
-    # Your domain name
     server_name $DOMAIN;
 
     # --- SSL Certificate Configuration ---
-    # Path to your certificate and private key
     ssl_certificate /home/ubuntu/certs/fullchain.pem;
     ssl_certificate_key /home/ubuntu/certs/key.pem;
-    
-    # Path to the trusted certificate chain for OCSP Stapling
-    # This resolves the "ssl_stapling ignored" warning
     ssl_trusted_certificate /home/ubuntu/certs/fullchain.pem;
     
     # --- SSL Performance and Security Enhancements ---
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 1d;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    # --- Location Blocks for Routing ---
 
     # Location for VLESS gRPC service
     location /vless-service {
         # Ensure the request is a valid gRPC request before proxying
-        if ($content_type !~ "application/grpc") {
+        # CORRECTED: Use '!=' for exact string comparison
+        if ($content_type != "application/grpc") {
             return 404;
         }
-        # Set timeouts for the gRPC connection
         grpc_read_timeout 300s;
         grpc_send_timeout 300s;
-        # Pass the request to the VLESS gRPC backend
         grpc_pass grpc://vless_grpc_backend;
     }
 
     # Location for Trojan gRPC service
     location /trojan-service {
         # Ensure the request is a valid gRPC request before proxying
-        if ($content_type !~ "application/grpc") {
+        # CORRECTED: Use '!=' for exact string comparison
+        if ($content_type != "application/grpc") {
             return 404;
         }
-        # Set timeouts for the gRPC connection
         grpc_read_timeout 300s;
         grpc_send_timeout 300s;
-        # Pass the request to the Trojan gRPC backend
         grpc_pass grpc://trojan_grpc_backend;
     }
 
-    # Default location to block any other requests to prevent access
+    # Default location to block any other requests
     location / {
-        return 404;
+        return 403;
     }
 }
 EOF
@@ -224,7 +219,7 @@ ufw allow 62051/tcp
 ufw --force enable
 
 # Restart services
-systemctl restart xray nginx > /dev/null 2>&1
+systemctl restart xray nginx
 
 # Verify services are running
 if systemctl is-active --quiet xray && systemctl is-active --quiet nginx; then
