@@ -224,7 +224,7 @@ ufw allow 62051/tcp
 ufw --force enable
 
 # Restart services
-systemctl restart xray nginx
+systemctl restart xray nginx > /dev/null 2>&1
 
 # Verify services are running
 if systemctl is-active --quiet xray && systemctl is-active --quiet nginx; then
