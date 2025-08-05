@@ -1,189 +1,153 @@
 #!/bin/bash
 
-# Update and install required packages
-apt update && apt install -y socat tree net-tools nginx curl wget
+# Stop on any error
+set -e
 
-# Install Xray
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+# --- Functions ---
 
-# Prompt for domain name and validate
-read -p "Enter your domain name: " DOMAIN
-if [ -z "$DOMAIN" ]; then
-    echo "Error: Domain name cannot be empty."
-    exit 1
-fi
-
-# Prompt for email and validate
-read -p "Enter your email for Let's Encrypt (e.g., inibudi@daouse.com): " MAIL
-if [ -z "$MAIL" ]; then
-    echo "Error: Email cannot be empty."
-    exit 1
-fi
-
-systemctl stop nginx
-# Create certificate directory
-mkdir -p /home/ubuntu/certs
-
-# Install acme.sh and issue certificate
-curl https://get.acme.sh | sh -s email="$MAIL"
-~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-~/.acme.sh/acme.sh --issue --standalone -d "$DOMAIN" \
-  --fullchain-file "/home/ubuntu/certs/fullchain.pem" \
-  --key-file "/home/ubuntu/certs/key.pem" \
-  --force
-
-# Check if certificate issuance was successful
-if [ ! -f "/home/ubuntu/certs/fullchain.pem" ] || [ ! -f "/home/ubuntu/certs/key.pem" ]; then
-    echo "Error: Certificate issuance failed."
-    exit 1
-fi
-
-# Configure Nginx
-cat > /etc/nginx/sites-available/vlessgrpc <<EOF
-# Upstream for the VLESS gRPC service running on port 2025
-upstream vless_grpc_backend {
-    server 127.0.0.1:2025;
-    keepalive 16;
+# Function to display colored text
+print_color() {
+  case $1 in
+    "green") echo -e "\033[32m$2\033[0m" ;;
+    "red") echo -e "\033[31m$2\033[0m" ;;
+    "yellow") echo -e "\033[33m$2\033[0m" ;;
+    *) echo "$2" ;;
+  esac
 }
 
-# Upstream for the Trojan gRPC service running on port 2026
-upstream trojan_grpc_backend {
-    server 127.0.0.1:2026;
-    keepalive 16;
+# Function to check if a command exists
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
 }
 
-# Main server block to handle incoming HTTPS traffic
+# --- Main Script ---
+
+# Check for root privileges
+if [ "$(id -u)" -ne 0 ]; then
+  print_color "red" "This script must be run as root. Please use sudo."
+  exit 1
+fi
+
+# --- User Input ---
+
+print_color "yellow" "Welcome to the Hysteria2 with Nginx Reverse Proxy Installer!"
+read -p "Enter your domain name (e.g., yourdomain.com): " DOMAIN
+read -p "Enter your email address (for Let's Encrypt): " EMAIL
+read -s -p "Enter a password for Hysteria2: " HYSTERIA_PASSWORD
+echo
+read -s -p "Enter a password for obfuscation (optional, press Enter to skip): " OBFS_PASSWORD
+echo
+
+# --- Install Dependencies ---
+
+print_color "green" "Updating system and installing dependencies..."
+apt-get update && apt-get upgrade -y
+apt-get install -y curl wget socat jq certbot python3-certbot-nginx
+
+# --- Install Hysteria2 ---
+
+print_color "green" "Installing Hysteria2..."
+bash <(curl -fsSL https://get.hy2.sh/)
+
+# --- Configure Hysteria2 ---
+
+print_color "green" "Configuring Hysteria2..."
+mkdir -p /etc/hysteria
+
+# Base config
+cat > /etc/hysteria/config.yaml <<EOF
+listen: :443
+
+acme:
+  domains:
+    - $DOMAIN
+  email: $EMAIL
+
+auth:
+  type: password
+  password: $HYSTERIA_PASSWORD
+EOF
+
+# Add obfs to server config if password is set
+if [ -n "$OBFS_PASSWORD" ]; then
+cat >> /etc/hysteria/config.yaml <<EOF
+
+obfs:
+  type: salamander
+  password: $OBFS_PASSWORD
+EOF
+fi
+
+# Add masquerade
+cat >> /etc/hysteria/config.yaml <<EOF
+
+listen: :443
+
+tls:
+  cert: /etc/letsencrypt/live/$DOMAIN/fullchain.pem
+  key: /etc/letsencrypt/live/$DOMAIN/privkey.pem
+
+auth:
+  type: password
+  password: inibapakbudi
+
+masquerade:
+  type: proxy
+  proxy:
+    url: https://bing.com
+    rewriteHost: true
+EOF
+
+# --- Stop Nginx for Certificate Generation ---
+
+print_color "yellow" "Stopping Nginx to generate SSL certificate..."
+if systemctl is-active --quiet nginx; then
+    systemctl stop nginx
+fi
+
+# --- Generate SSL Certificate ---
+
+print_color "green" "Generating SSL certificate with Certbot..."
+certbot certonly --standalone --agree-tos --no-eff-email --email "$EMAIL" -d "$DOMAIN"
+
+# --- Configure Nginx as Reverse Proxy ---
+sudo chown root:hysteria /etc/letsencrypt/live/$DOMAIN/privkey.pem
+sudo chmod 640 /etc/letsencrypt/live/$DOMAIN/privkey.pem
+sudo chmod 644 /etc/letsencrypt/live/$DOMAIN/fullchain.pem
+
+print_color "green" "Configuring Nginx as a reverse proxy..."
+cat > /etc/nginx/sites-available/hysteria <<EOF
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 80;
     server_name $DOMAIN;
 
-    # --- SSL Certificate Configuration ---
-    ssl_certificate /home/ubuntu/certs/fullchain.pem;
-    ssl_certificate_key /home/ubuntu/certs/key.pem;
-    ssl_trusted_certificate /home/ubuntu/certs/fullchain.pem;
-    
-    # --- SSL Performance and Security Enhancements ---
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_stapling on;
-    ssl_stapling_verify on;
-
-    # --- Location Blocks for Routing ---
-
-    # Location for VLESS gRPC service
-    # The 'if' block has been removed for simplicity. 
-    # Xray will handle any non-gRPC requests.
-    location /vless-service {
-        grpc_read_timeout 300s;
-        grpc_send_timeout 300s;
-        grpc_pass grpc://vless_grpc_backend;
-    }
-
-    # Location for Trojan gRPC service
-    # The 'if' block has been removed for simplicity.
-    location /trojan-service {
-        grpc_read_timeout 300s;
-        grpc_send_timeout 300s;
-        grpc_pass grpc://trojan_grpc_backend;
-    }
-
-    # Default location to block any other requests
+    # Redirect HTTP to HTTPS
     location / {
-        return 403;
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080; # Assuming Hysteria's masquerade is on 8080
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 EOF
 
-# Remove default Nginx site and enable new configuration
-rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/vlessgrpc /etc/nginx/sites-enabled/vlessgrpc
 
-# Configure Xray
-cat > /usr/local/etc/xray/config.json <<EOF
-{
-  "log": {
-    "loglevel": "debug"
-  },
-  "dns": {
-    "servers": [
-      "1.1.1.1",
-      "1.0.0.1"
-    ]
-  },
-  "routing": {
-    "domainStrategy": "AsIs",
-    "rules": [
-      {
-        "type": "field",
-        "outboundTag": "block",
-        "domain": [
-          "geosite:category-ads-all"
-        ]
-      }
-    ]
-  },
-  "inbounds": [
-    {
-      "port": 2025,
-      "listen": "127.0.0.1",
-      "protocol": "vless",
-      "settings": {
-        "clients": [
-          {
-            "id": "1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1",
-            "level": 0
-          }
-        ],
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "grpc",
-        "security": "none",
-        "grpcSettings": {
-          "serviceName": "vless-service"
-        }
-      }
-    },
-    {
-      "port": 2026,
-      "listen": "127.0.0.1",
-      "protocol": "trojan",
-      "settings": {
-        "clients": [
-          {
-            "password": "ec0a721c3be5d839",
-            "level": 0
-          }
-        ]
-      },
-      "streamSettings": {
-        "network": "grpc",
-        "security": "none",
-        "grpcSettings": {
-          "serviceName": "trojan-service"
-        }
-      }
-    }
-  ],
-  "outbounds": [
-    {
-      "protocol": "freedom",
-      "settings": {}
-    },
-    {
-      "protocol": "blackhole",
-      "tag": "block"
-    }
-  ]
-}
-EOF
-
-# Set proper permissions for certificates
-chown -R www-data:www-data /home/ubuntu/certs
-chmod 600 /home/ubuntu/certs/key.pem
-
-# Firewall configuration
+# firewall configuration
+print_color "green" "Configuring UFW firewall..."
 echo "Configuring firewall..."
 ufw allow 8000/tcp
 ufw allow 80/tcp
@@ -211,49 +175,72 @@ ufw allow 62051/tcp
 
 ufw --force enable
 
-# Restart services
-systemctl restart xray nginx
-
-# Verify services are running
-if systemctl is-active --quiet xray && systemctl is-active --quiet nginx; then
-    echo "Xray and Nginx have been configured and started successfully."
-    echo "===================================================="
-    echo "Configuration links:"
-    echo "===================================================="
-    echo "https://sub.bonds.id/sub2?target=clash&url=vless%3A%2F%2F1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1%40$DOMAIN%3A443%3Fencryption%3Dnone%26security%3Dtls%26type%3Dgrpc%26serviceName%3Dvless-service%26sni%3D$DOMAIN%23vless-grpc%7Ctrojan%3A%2F%2Fec0a721c3be5d839%40$DOMAIN%3A443%3Fsecurity%3Dtls%26type%3Dgrpc%26serviceName%3Dtrojan-service%26sni%3D$DOMAIN%23Trojan-gRPC&insert=false&config=base%2Fdatabase%2Fconfig%2Fstandard%2Fstandard_redir.ini&emoji=false&list=true&udp=true&tfo=false&expand=false&scv=true&fdn=false&sort=false&new_name=true"
-    echo "===================================================="
-    cat > /home/ubuntu/config.txt <<EOF
-  - name: vless-grpc
-    server: $DOMAIN
-    port: 443
-    type: vless
-    uuid: 1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1
-    cipher: auto
-    tls: true
-    skip-cert-verify: true
-    servername: $DOMAIN
-    network: grpc
-    grpc-opts:
-      grpc-service-name: vless-service
-    udp: true
-  - name: Trojan-gRPC
-    server: $DOMAIN
-    port: 443
-    type: trojan
-    password: ec0a721c3be5d839
-    skip-cert-verify: true
-    sni: $DOMAIN
-    network: grpc
-    grpc-opts:
-      grpc-service-name: trojan-service
-    udp: true
-EOF
-    cat /home/ubuntu/config.txt
-    echo "===================================================="
-    echo "You can find the configuration in $HOME/config.txt"
-    echo "===================================================="
-    echo "Configuration complete. You can now use the provided links to connect."
-else
-    echo "Error: Failed to start Xray or Nginx."
-    exit 1
+# Enable the Nginx configuration, avoiding error if it already exists
+if [ ! -L /etc/nginx/sites-enabled/hysteria ]; then
+  ln -s /etc/nginx/sites-available/hysteria /etc/nginx/sites-enabled/
 fi
+
+# --- Start Services ---
+
+print_color "green" "Starting Nginx and Hysteria2 services..."
+systemctl start nginx
+systemctl restart hysteria-server.service
+
+# --- Display Client Configuration ---
+
+print_color "yellow" "Installation complete! Client configurations below."
+
+# --- Standard Client Config (JSON) ---
+print_color "yellow" "\nStandard Hysteria2 Client Configuration (config.json):"
+print_color "green" "========================================================"
+
+# Base client config
+CLIENT_CONFIG_JSON=$(cat <<EOF
+{
+  "server": "$DOMAIN:443",
+  "auth": "$HYSTERIA_PASSWORD",
+  "tls": {
+    "sni": "$DOMAIN",
+    "insecure": false
+  }
+}
+EOF
+)
+
+# Add obfs to client config if password is set
+if [ -n "$OBFS_PASSWORD" ]; then
+  CLIENT_CONFIG_JSON=$(echo "$CLIENT_CONFIG_JSON" | jq --arg obfs_pass "$OBFS_PASSWORD" '. + {obfs: {type: "salamander", password: $obfs_pass}}')
+fi
+
+# Pretty print the final JSON
+echo "$CLIENT_CONFIG_JSON" | jq .
+print_color "green" "========================================================"
+
+# --- Clash Meta (mihomo) Client Config (YAML) ---
+print_color "yellow" "\nClash Meta (mihomo) Client Configuration (YAML snippet):"
+print_color "green" "========================================================"
+# Base YAML config
+cat <<EOF
+proxies:
+  - name: "Hysteria2"
+    type: hysteria2
+    server: $DOMAIN
+    port: 443
+    password: "$PASSWORD"
+    sni: $DOMAIN
+    skip-cert-verify: false
+    alpn: [h3]
+    protocol: udp
+    up: "100 Mbps"
+    down: "500 Mbps"
+EOF
+
+# Conditionally add obfuscation to YAML
+if [ -n "$OBFS_PASSWORD" ]; then
+cat <<EOF
+    obfs: salamander
+    obfs-password: $OBFS_PASSWORD
+EOF
+fi
+print_color "green" "========================================================"
+print_color "yellow" "Add the YAML snippet to your Clash Meta configuration file."
