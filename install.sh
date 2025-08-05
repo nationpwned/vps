@@ -77,7 +77,7 @@ server {
     # Location for VLESS gRPC service
     location /vless-service {
         # Ensure the request is a valid gRPC request before proxying
-        if ($content_type != "application/grpc") {
+        if ($content_type !~ "application/grpc") {
             return 404;
         }
         # Set timeouts for the gRPC connection
@@ -90,7 +90,7 @@ server {
     # Location for Trojan gRPC service
     location /trojan-service {
         # Ensure the request is a valid gRPC request before proxying
-        if ($content_type != "application/grpc") {
+        if ($content_type !~ "application/grpc") {
             return 404;
         }
         # Set timeouts for the gRPC connection
