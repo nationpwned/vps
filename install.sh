@@ -32,7 +32,7 @@ fi
 
 print_color "yellow" "Welcome to the Hysteria2 with Nginx Reverse Proxy Installer!"
 read -p "Enter your domain name (e.g., yourdomain.com): " DOMAIN
-read -p "Enter your email address (for Let's Encrypt): " EMAIL
+read -p "Enter your email address (for Let's Encrypt) inibudi@daouse.com: " EMAIL
 read -s -p "Enter a password for Hysteria2: " HYSTERIA_PASSWORD
 echo
 read -s -p "Enter a password for obfuscation (optional, press Enter to skip): " OBFS_PASSWORD
