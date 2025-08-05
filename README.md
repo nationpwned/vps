@@ -10,5 +10,5 @@
 - client conf looks like this..
 
 - vless://1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1@YOUR_DOMAIN:443?encryption=none&security=tls&type=grpc&serviceName=vless-service&sni=YOUR_DOMAIN#vless-grpc
-- trojan://1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1@YOUR_DOMAIN:443?encryption=none&security=tls&type=grpc&serviceName=trojan-service&sni=YOUR_DOMAIN#trojan-grpc
+- trojan://ec0a721c3be5d839@YOUR_DOMAIN:443?security=tls&type=grpc&serviceName=trojan-service&sni=YOUR_DOMAIN#Trojan-gRPC
 
