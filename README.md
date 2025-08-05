@@ -1,5 +1,5 @@
 
-# marzban
+# Marzneshin
 - curl -fsSL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/marzneshin/install.sh -o install.sh
   
 - chmod +x install.sh
