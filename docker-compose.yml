@@ -1,28 +1,29 @@
 services:
-  marzban:
-    image: gozargah/marzban:latest
+  marzneshin:
+    image: dawsh/marzneshin:latest
     restart: always
     env_file: .env
+    network_mode: host
     volumes:
-      - /var/lib/marzban:/var/lib/marzban
+      - /var/lib/marzneshin:/var/lib/marzneshin
     ports:
       - "8000:8000"
     networks:
-      - marzban-net
+      - marzneshin-net
 
   nginx:
     image: nginx:latest
     restart: always
     volumes:
-      - /opt/marzban/nginx.conf:/etc/nginx/nginx.conf
-      - /var/lib/marzban/certs:/etc/nginx/certs
+      - /opt/marzneshin/nginx.conf:/etc/nginx/nginx.conf
+      - /var/lib/marzneshin/certs:/etc/nginx/certs
       - /var/www/html:/var/www/html
     ports:
       - "443:443"
     depends_on:
-      - marzban
+      - marzneshin
     networks:
-      - marzban-net
+      - marzneshin-net
   wgcf-warp:
     image: linuxserver/wireguard
     container_name: wgcf-warp
@@ -34,13 +35,13 @@ services:
       - PGID=1000
       - TZ=Asia/Jakarta
     volumes:
-      - /opt/marzban/wgcf:/config
+      - /opt/marzneshin/wgcf:/config
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     restart: always
     networks:
-      - marzban-net
+      - marzneshin-net
 
 networks:
-  marzban-net:
+  marzneshin-net:
     driver: bridge
