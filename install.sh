@@ -217,8 +217,42 @@ systemctl restart xray nginx
 # Verify services are running
 if systemctl is-active --quiet xray && systemctl is-active --quiet nginx; then
     echo "Xray and Nginx have been configured and started successfully."
-    echo "vless://1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1@$DOMAIN:443?encryption=none&security=tls&type=grpc&serviceName=vless-service&sni=$DOMAIN#vless-grpc"
-    echo "trojan://ec0a721c3be5d839@$DOMAIN:443?security=tls&type=grpc&serviceName=trojan-service&sni=$DOMAIN#Trojan-gRPC"
+    echo "===================================================="
+    echo "Configuration links:"
+    echo "===================================================="
+    echo "https://sub.bonds.id/sub2?target=clash&url=vless%3A%2F%2F1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1%40$DOMAIN%3A443%3Fencryption%3Dnone%26security%3Dtls%26type%3Dgrpc%26serviceName%3Dvless-service%26sni%3D$DOMAIN%23vless-grpc%7Ctrojan%3A%2F%2Fec0a721c3be5d839%40$DOMAIN%3A443%3Fsecurity%3Dtls%26type%3Dgrpc%26serviceName%3Dtrojan-service%26sni%3D$DOMAIN%23Trojan-gRPC&insert=false&config=base%2Fdatabase%2Fconfig%2Fstandard%2Fstandard_redir.ini&emoji=false&list=true&udp=true&tfo=false&expand=false&scv=true&fdn=false&sort=false&new_name=true"
+    echo "===================================================="
+    cat > /home/ubuntu/config.txt <<EOF
+  - name: vless-grpc
+    server: $DOMAIN
+    port: 443
+    type: vless
+    uuid: 1f9b8529-d065-4ac2-a1f2-d56a2c2edbc1
+    cipher: auto
+    tls: true
+    skip-cert-verify: true
+    servername: $DOMAIN
+    network: grpc
+    grpc-opts:
+      grpc-service-name: vless-service
+    udp: true
+  - name: Trojan-gRPC
+    server: $DOMAIN
+    port: 443
+    type: trojan
+    password: ec0a721c3be5d839
+    skip-cert-verify: true
+    sni: $DOMAIN
+    network: grpc
+    grpc-opts:
+      grpc-service-name: trojan-service
+    udp: true
+EOF
+    cat /home/ubuntu/config.txt
+    echo "===================================================="
+    echo "You can find the configuration in $HOME/config.txt"
+    echo "===================================================="
+    echo "Configuration complete. You can now use the provided links to connect."
 else
     echo "Error: Failed to start Xray or Nginx."
     exit 1
