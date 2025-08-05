@@ -32,10 +32,10 @@ fi
 
 print_color "yellow" "Welcome to the Hysteria2 with Nginx Reverse Proxy Installer!"
 read -p "Enter your domain name (e.g., yourdomain.com): " DOMAIN
-read -p "Enter your email address (for Let's Encrypt): " EMAIL
-read -s -p "Enter a password for Hysteria2: " HYSTERIA_PASSWORD
+read -p "Enter your email address (for Let's Encrypt, example inibudi@daouse.com): " EMAIL
+read -p "Enter a password for Hysteria2 (example @InibapakBudi2025): " HYSTERIA_PASSWORD
 echo
-read -s -p "Enter a password for obfuscation (optional, press Enter to skip): " OBFS_PASSWORD
+read -p "Enter a password for obfuscation (optional, press Enter to skip) (example @IniibuBudi2025): " OBFS_PASSWORD
 echo
 
 # --- Install Dependencies ---
@@ -224,7 +224,7 @@ EOF
 if [ -n "$OBFS_PASSWORD" ]; then
 cat <<EOF
     obfs: salamander
-    obfs-password: $OBFS_PASSWORD
+    obfs-password: "$OBFS_PASSWORD"
 EOF
 fi
 print_color "green" "========================================================"
