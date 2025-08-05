@@ -42,8 +42,6 @@ sysctl -p >/dev/null 2>&1
 
 rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
 # Install marzneshin
-marzneshin down >/dev/null 2>&1 || true
-
 rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
 rm -Rf /var/lib/marzneshin >/dev/null 2>&1 || true
 
@@ -200,4 +198,3 @@ if [[ "$answer" =~ ^[Yy]$ ]]; then
 else
   echo "Reboot cancelled. Please reboot manually if needed."
 fi
-
