@@ -49,8 +49,8 @@
         "tlsSettings": {
           "certificates": [
             {
-              "certificateFile": "/var/lib/marzneshin/certs/fullchain.pem",
-              "keyFile": "/var/lib/marzneshin/certs/key.pem"
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
             }
           ]
         },
@@ -78,8 +78,8 @@
         "tlsSettings": {
           "certificates": [
             {
-              "certificateFile": "/var/lib/marzneshin/certs/fullchain.pem",
-              "keyFile": "/var/lib/marzneshin/certs/key.pem"
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
             }
           ]
         },
@@ -105,8 +105,8 @@
         "tlsSettings": {
           "certificates": [
             {
-              "certificateFile": "/var/lib/marzneshin/certs/fullchain.pem",
-              "keyFile": "/var/lib/marzneshin/certs/key.pem"
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
             }
           ]
         },
@@ -132,8 +132,8 @@
         "tlsSettings": {
           "certificates": [
             {
-              "certificateFile": "/var/lib/marzneshin/certs/fullchain.pem",
-              "keyFile": "/var/lib/marzneshin/certs/key.pem"
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
             }
           ]
         },
