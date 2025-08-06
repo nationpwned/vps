@@ -5,7 +5,6 @@ services:
     env_file: .env
     environment:
       SQLALCHEMY_DATABASE_URL: "mariadb+pymysql://root:12341234@127.0.0.1/marzneshin"
-    network_mode: host
     volumes:
       - /var/lib/marzneshin:/var/lib/marzneshin
     depends_on:
@@ -15,7 +14,6 @@ services:
   marznode:
     image: dawsh/marznode:latest
     restart: always
-    network_mode: host
     environment:
       SERVICE_ADDRESS: "127.0.0.1"
       INSECURE: "True"
