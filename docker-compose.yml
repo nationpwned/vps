@@ -4,13 +4,15 @@ services:
     restart: always
     env_file: .env
     environment:
-      SQLALCHEMY_DATABASE_URL: "mariadb+pymysql://root:12341234@127.0.0.1/marzneshin"
+      SQLALCHEMY_DATABASE_URL: "mariadb+pymysql://root:12341234@db/marzneshin"
     volumes:
       - /var/lib/marzneshin:/var/lib/marzneshin
     depends_on:
       db:
         condition: service_healthy
         required: true
+    networks:
+      - marzneshin-net
   marznode:
     image: dawsh/marznode:latest
     restart: always
@@ -24,6 +26,8 @@ services:
       SSL_CERT_FILE: "./server.cert"
     volumes:
       - /var/lib/marznode:/var/lib/marznode
+    networks:
+      - marzneshin-net
   db:
     image: mariadb:latest
     restart: always
@@ -38,7 +42,8 @@ services:
       test: healthcheck.sh --connect
       interval: 5s
       retries: 4
-
+    networks:
+      - marzneshin-net
   nginx:
     image: nginx:latest
     restart: always
