@@ -126,8 +126,8 @@ ufw allow 8445/tcp
 ufw allow 8446/tcp
 ufw allow 8447/tcp
 ufw allow 8448/tcp
-ufw allow 9443/tcp
-ufw allow 10443/tcp
+ufw allow 8449/tcp
+ufw allow 8450/tcp
 ufw allow 22/tcp
 ufw allow 2222/tcp
 ufw allow 2021/tcp
