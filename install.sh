@@ -45,7 +45,7 @@ rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
 rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
 rm -Rf /var/lib/marzneshin >/dev/null 2>&1 || true
 
-bash -c "$(curl -sL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/marzneshin/marzneshin)" @ install
+bash -c "$(curl -sL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/marzneshin/marzneshin)" @ install --database mariadb
 sleep 50
 
 marzneshin cli admin create --sudo
