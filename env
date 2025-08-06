@@ -8,13 +8,13 @@ UVICORN_PORT=8000
 # SUDO_PASSWORD = admin
 
 # UVICORN_UDS = /run/marzneshin.socket
-UVICORN_SSL_CERTFILE = /var/lib/marzneshin/certs/fullchain.pem
-UVICORN_SSL_KEYFILE = /var/lib/marzneshin/certs/key.pem
+# UVICORN_SSL_CERTFILE = /var/lib/marzneshin/certs/fullchain.pem
+# UVICORN_SSL_KEYFILE = /var/lib/marzneshin/certs/key.pem
 # UVICORN_SSL_CA_TYPE = public
 
 # DASHBOARD_PATH = /dashboard/
 
-XRAY_JSON=/var/lib/marzneshin/xray_config.json
+# XRAY_JSON=/var/lib/marzneshin/xray_config.json
 # XRAY_SUBSCRIPTION_URL_PREFIX = https://example.com
 # XRAY_SUBSCRIPTION_PATH = sub
 # XRAY_EXECUTABLE_PATH = /usr/local/bin/xray
@@ -90,8 +90,8 @@ HOME_PAGE_TEMPLATE=home/index.html
 # LOGIN_NOTIFY_WHITE_LIST = 1.1.1.1,127.0.0.1
 
 ## for developers
-# DOCS = True
-# DEBUG = True
+DOCS = True
+DEBUG = True
 
 # If You Want To Send Webhook To Multiple Server Add Multi Address
 # WEBHOOK_ADDRESS = http://127.0.0.1:9000/,http://127.0.0.1:9001/
