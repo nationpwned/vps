@@ -112,6 +112,9 @@ sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzneshin/xray_config.json
 mkdir -p /var/lib/marzneshin/templates/subscription/
 wget -N -P /var/lib/marzneshin/templates/subscription/ https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/index.html
 
+# singbox config
+wget -N -P /etc/opt/marzneshin/ https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/singbox.json
+
 # Firewall configuration
 echo "Configuring firewall..."
 ufw allow 8000/tcp
