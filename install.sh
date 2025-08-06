@@ -117,6 +117,9 @@ echo "Configuring firewall..."
 ufw allow 8000/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
+ufw allow 8443/tcp
+ufw allow 9443/tcp
+ufw allow 10443/tcp
 ufw allow 22/tcp
 ufw allow 2222/tcp
 ufw allow 2021/tcp
