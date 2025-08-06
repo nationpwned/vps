@@ -96,21 +96,21 @@ fi
 
 wget -O /opt/marzneshin/.env https://github.com/nationpwned/mz/raw/refs/heads/main/env
 # Download docker-compose.yml
-wget -O /opt/marzneshin/docker-compose.yml https://github.com/nationpwned/mz/raw/refs/heads/main/docker-compose.yml
+wget -O /opt/marzneshin/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/docker-compose.yml
 
 # Download nginx.conf
-wget -O /opt/marzneshin/nginx.conf https://raw.githubusercontent.com/nationpwned/mz/refs/heads/main/nginx.conf
+wget -O /opt/marzneshin/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/nginx.conf
 # Replace placeholders in nginx.conf with user input
 sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzneshin/nginx.conf
 
 # Download xray_config.json
-wget -O /var/lib/marzneshin/xray_config.json https://github.com/nationpwned/mz/raw/refs/heads/main/xray_config.json
+wget -O /var/lib/marzneshin/xray_config.json https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/xray_config.json
 
 sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzneshin/xray_config.json
 
 # Download the subscribers marzneshin
 mkdir -p /var/lib/marzneshin/templates/subscription/
-wget -N -P /var/lib/marzneshin/templates/subscription/ https://github.com/nationpwned/mz/raw/refs/heads/main/index.html
+wget -N -P /var/lib/marzneshin/templates/subscription/ https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/index.html
 
 # Firewall configuration
 echo "Configuring firewall..."
