@@ -80,17 +80,17 @@ fi
 
 # Check if certificate already exists
 rm -Rf /var/lib/marzneshin/certs >/dev/null 2>&1 || true
-if [[ -f "/var/lib/marzneshin/certs/fullchain.pem" && -f "/var/lib/marzneshin/certs/key.pem" ]]; then
+if [[ -f "/var/lib/marzneshin/certs/fullchain.pem" && -f "/var/lib/marzneshin/certs/privkey.pem" ]]; then
     echo "SSL certificate already exists. Skipping certificate installation."
 else
     # Install Certificate using acme.sh
     bash -c "curl https://get.acme.sh | sh -s email=$MAIL"
     mkdir -p /var/lib/marzneshin/certs
-    bash -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzneshin/certs/fullchain.pem\" --key-file \"/var/lib/marzneshin/certs/key.pem\""
+    bash -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzneshin/certs/fullchain.pem\" --key-file \"/var/lib/marzneshin/certs/privkey.pem\""
     marzneshin down
 
     # Set proper permissions
-    chmod 600 "/var/lib/marzneshin/certs/key.pem"
+    chmod 600 "/var/lib/marzneshin/certs/privkey.pem"
     chmod 644 "/var/lib/marzneshin/certs/fullchain.pem"
 fi
 
