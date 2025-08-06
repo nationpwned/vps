@@ -19,10 +19,11 @@ services:
       XRAY_EXECUTABLE_PATH: "/usr/local/bin/xray"
       XRAY_ASSETS_PATH: "/usr/local/lib/xray"
       XRAY_CONFIG_PATH: "/var/lib/marznode/xray_config.json"
-      SSL_KEY_FILE: "/etc/opt/marzneshin/certs/private.key"
+      SSL_KEY_FILE: "/etc/opt/marzneshin/certs/privkey.pem"
       SSL_CERT_FILE: "/etc/opt/marzneshin/certs/fullchain.pem"
     volumes:
       - /var/lib/marznode:/var/lib/marznode
+      - /etc/opt/marzneshin/certs:/etc/opt/marzneshin/certs:ro
 
   nginx:
     image: nginx:latest
