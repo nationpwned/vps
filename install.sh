@@ -56,7 +56,7 @@ marzneshin cli admin create --sudo
 
 # Generate Reality keys
 echo "Generating Reality keys..."
-docker exec marzneshin-marzneshin-1 xray x25519 genkey > /$HOME/reality.txt
+docker exec marzneshin-marznode-1 xray x25519 genkey > /$HOME/reality.txt
 PRIVATE_KEY=$(grep -oP 'Private key: \K\S+' /$HOME/reality.txt)
 PUBLIC_KEY=$(grep -oP 'Public key: \K\S+' /$HOME/reality.txt)
 
@@ -67,11 +67,11 @@ SHORTIDS=$(cat /$HOME/shortIds.txt)
 
 # Generating uuid for Reality
 echo "Generating UUID for Reality..."
-if ! docker ps | grep -q marzneshin-marzneshin-1; then
+if ! docker ps | grep -q marzneshin-marznode-1; then
   echo "marzneshin container not running! Exiting."
   exit 1
 fi
-docker exec marzneshin-marzneshin-1 xray uuid > /$HOME/xray_uuid.txt
+docker exec marzneshin-marznode-1 xray uuid > /$HOME/xray_uuid.txt
 XRAY_UUID=$(cat /$HOME/xray_uuid.txt)
 if [[ -z "$XRAY_UUID" ]]; then
   echo "Failed to generate UUID. Exiting."
