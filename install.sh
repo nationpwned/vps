@@ -118,6 +118,11 @@ ufw allow 8000/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 8443/tcp
+ufw allow 8444/tcp
+ufw allow 8445/tcp
+ufw allow 8446/tcp
+ufw allow 8447/tcp
+ufw allow 8448/tcp
 ufw allow 9443/tcp
 ufw allow 10443/tcp
 ufw allow 22/tcp
