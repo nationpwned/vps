@@ -7,7 +7,9 @@
     "dns": {
         "servers": [
             "1.1.1.1",
-            "1.0.0.1"
+            "1.0.0.1",
+            "8.8.8.8",
+            "8.8.4.4"
         ]
     },
     "inbounds": [
@@ -24,10 +26,10 @@
                 "decryption": "none"
             },
             "streamSettings": {
-                "network": "http",
-                "httpSettings": {
-                    "path": "/vless-http2",
-                    "host": ["nextg.sibondt.my.id"]
+                "network": "xhttp",
+                "xhttpSettings": {
+                    "path": "/marzneshin/vless-xhttp",
+                    "host": "nextg.sibondt.my.id"
                 },
                 "security": "tls",
                 "tlsSettings": {
@@ -46,7 +48,7 @@
                 "enabled": true,
                 "destOverride": ["http", "tls", "quic"]
             },
-            "tag": "vless-http2"
+            "tag": "vless-xhttp"
         },
         {
             "port": 8444,
@@ -63,7 +65,7 @@
             "streamSettings": {
                 "network": "ws",
                 "wsSettings": {
-                    "path": "/vless-ws"
+                    "path": "/marzneshin/vless-ws"
                 },
                 "security": "tls",
                 "tlsSettings": {
