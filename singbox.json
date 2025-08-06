@@ -1,0 +1,61 @@
+{
+  "log": {
+    "level": "warn",
+    "output": "/var/log/sing-box/sing-box.log",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-h2",
+      "listen": "127.0.0.1",
+      "listen_port": 8447,
+      "users": [
+        {
+          "uuid": "9b93dc93-197a-42be-968c-4c25e855ef7f",
+          "flow": ""
+        }
+      ],
+      "transport": {
+        "type": "http",
+        "path": "/marzneshin/singbox-vless-h2",
+        "host": ["nextg.sibondt.my.id"]
+      },
+      "tls": {
+        "enabled": true,
+        "server_name": "nextg.sibondt.my.id",
+        "certificate_path": "/etc/opt/marzneshin/certs/fullchain.pem",
+        "key_path": "/etc/opt/marzneshin/certs/privkey.pem",
+        "min_version": "1.2"
+      },
+      "sniff": true,
+      "sniff_override_destination": true
+    },
+    {
+      "type": "trojan",
+      "tag": "trojan-tcp",
+      "listen": "127.0.0.1",
+      "listen_port": 8448,
+      "users": [
+        {
+          "password": "9b93dc93-197a-42be-968c-4c25e855ef7f"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "nextg.sibondt.my.id",
+        "certificate_path": "/etc/opt/marzneshin/certs/fullchain.pem",
+        "key_path": "/etc/opt/marzneshin/certs/privkey.pem",
+        "min_version": "1.2"
+      },
+      "sniff": true,
+      "sniff_override_destination": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
