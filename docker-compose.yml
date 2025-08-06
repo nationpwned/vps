@@ -3,78 +3,34 @@ services:
     image: dawsh/marzneshin:latest
     restart: always
     env_file: .env
+    network_mode: host
     environment:
-      SQLALCHEMY_DATABASE_URL: "mariadb+pymysql://root:12341234@db/marzneshin"
+      SQLALCHEMY_DATABASE_URL: "sqlite:////var/lib/marzneshin/db.sqlite3"
     volumes:
       - /var/lib/marzneshin:/var/lib/marzneshin
-    depends_on:
-      db:
-        condition: service_healthy
-        required: true
-    networks:
-      - marzneshin-net
+
   marznode:
     image: dawsh/marznode:latest
     restart: always
+    network_mode: host
     environment:
       SERVICE_ADDRESS: "127.0.0.1"
       INSECURE: "True"
       XRAY_EXECUTABLE_PATH: "/usr/local/bin/xray"
       XRAY_ASSETS_PATH: "/usr/local/lib/xray"
       XRAY_CONFIG_PATH: "/var/lib/marznode/xray_config.json"
-      SSL_KEY_FILE: "./server.key"
-      SSL_CERT_FILE: "./server.cert"
+      SSL_KEY_FILE: "/etc/opt/marzneshin/certs/private.key"
+      SSL_CERT_FILE: "/etc/opt/marzneshin/certs/fullchain.pem"
     volumes:
       - /var/lib/marznode:/var/lib/marznode
-    networks:
-      - marzneshin-net
-  db:
-    image: mariadb:latest
-    restart: always
-    environment:
-      MARIADB_ROOT_PASSWORD: 12341234
-      MARIADB_DATABASE: marzneshin
-    volumes:
-      - /var/lib/marzneshin/mysql:/var/lib/mysql
-    ports:
-      - "127.0.0.1:3306:3306"
-    healthcheck:
-      test: healthcheck.sh --connect
-      interval: 5s
-      retries: 4
-    networks:
-      - marzneshin-net
+
   nginx:
     image: nginx:latest
     restart: always
+    network_mode: host
     volumes:
-      - /opt/marzneshin/nginx.conf:/etc/nginx/nginx.conf
-      - /var/lib/marzneshin/certs:/etc/nginx/certs
-      - /var/www/html:/var/www/html
-    ports:
-      - "443:443"
-    depends_on:
-      - marzneshin
-    networks:
-      - marzneshin-net
-  wgcf-warp:
-    image: linuxserver/wireguard
-    container_name: wgcf-warp
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Asia/Jakarta
-    volumes:
-      - /opt/marzneshin/wgcf:/config
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-    restart: always
-    networks:
-      - marzneshin-net
-
-networks:
-  marzneshin-net:
-    driver: bridge
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /var/lib/marzneshin:/var/lib/marzneshin:ro
+      - /var/lib/marznode:/var/lib/marznode:ro
+      - /etc/opt/marzneshin/certs:/etc/nginx/certs:ro
+      - /var/www/html:/var/www/html:ro
