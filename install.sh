@@ -6,8 +6,8 @@ if [ "$EUID" -ne 0 ]; then
   echo "Please run as root (e.g., with sudo su)" >&2
   exit 1
 fi
-# Define the domain for your Marzban instance
-read -p "Enter your domain for Marzban: " DOMAIN
+# Define the domain for your marzneshin instance
+read -p "Enter your domain for marzneshin: " DOMAIN
 read -p "Enter your email for SSL certificate (inibudi@daouse.com): " MAIL
 
 
@@ -40,17 +40,15 @@ else
 fi
 sysctl -p >/dev/null 2>&1
 
-rm -Rf /opt/marzban >/dev/null 2>&1 || true
-# Install Marzban
-marzban down >/dev/null 2>&1 || true
+rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
+# Install marzneshin
+rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
+rm -Rf /var/lib/marzneshin >/dev/null 2>&1 || true
 
-rm -Rf /opt/marzban >/dev/null 2>&1 || true
-rm -Rf /var/lib/marzban >/dev/null 2>&1 || true
-
-bash -c "$(curl -sL https://github.com/nationpwned/mz/raw/refs/heads/main/marzban)" @ install
+bash -c "$(curl -sL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/marzneshin/marzneshin)" @ install --database mariadb
 sleep 50
 
-marzban cli admin create --sudo
+marzneshin cli admin create --sudo
 
 [ -f /$HOME/reality.txt ] && rm -f /$HOME/reality.txt
 [ -f /$HOME/shortIds.txt ] && rm -f /$HOME/shortIds.txt
@@ -58,7 +56,7 @@ marzban cli admin create --sudo
 
 # Generate Reality keys
 echo "Generating Reality keys..."
-docker exec marzban-marzban-1 xray x25519 genkey > /$HOME/reality.txt
+docker exec marzneshin-marznode-1 xray x25519 genkey > /$HOME/reality.txt
 PRIVATE_KEY=$(grep -oP 'Private key: \K\S+' /$HOME/reality.txt)
 PUBLIC_KEY=$(grep -oP 'Public key: \K\S+' /$HOME/reality.txt)
 
@@ -69,11 +67,11 @@ SHORTIDS=$(cat /$HOME/shortIds.txt)
 
 # Generating uuid for Reality
 echo "Generating UUID for Reality..."
-if ! docker ps | grep -q marzban-marzban-1; then
-  echo "Marzban container not running! Exiting."
+if ! docker ps | grep -q marzneshin-marznode-1; then
+  echo "marzneshin container not running! Exiting."
   exit 1
 fi
-docker exec marzban-marzban-1 xray uuid > /$HOME/xray_uuid.txt
+docker exec marzneshin-marznode-1 xray uuid > /$HOME/xray_uuid.txt
 XRAY_UUID=$(cat /$HOME/xray_uuid.txt)
 if [[ -z "$XRAY_UUID" ]]; then
   echo "Failed to generate UUID. Exiting."
@@ -81,38 +79,38 @@ if [[ -z "$XRAY_UUID" ]]; then
 fi
 
 # Check if certificate already exists
-rm -Rf /var/lib/marzban/certs >/dev/null 2>&1 || true
-if [[ -f "/var/lib/marzban/certs/fullchain.pem" && -f "/var/lib/marzban/certs/key.pem" ]]; then
+rm -Rf /var/lib/marzneshin/certs >/dev/null 2>&1 || true
+if [[ -f "/var/lib/marzneshin/certs/fullchain.pem" && -f "/var/lib/marzneshin/certs/key.pem" ]]; then
     echo "SSL certificate already exists. Skipping certificate installation."
 else
     # Install Certificate using acme.sh
     bash -c "curl https://get.acme.sh | sh -s email=$MAIL"
-    mkdir -p /var/lib/marzban/certs
-    bash -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzban/certs/fullchain.pem\" --key-file \"/var/lib/marzban/certs/key.pem\""
-    marzban down
+    mkdir -p /var/lib/marzneshin/certs
+    bash -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzneshin/certs/fullchain.pem\" --key-file \"/var/lib/marzneshin/certs/key.pem\""
+    marzneshin down
 
     # Set proper permissions
-    chmod 600 "/var/lib/marzban/certs/key.pem"
-    chmod 644 "/var/lib/marzban/certs/fullchain.pem"
+    chmod 600 "/var/lib/marzneshin/certs/key.pem"
+    chmod 644 "/var/lib/marzneshin/certs/fullchain.pem"
 fi
 
-wget -O /opt/marzban/.env https://github.com/nationpwned/mz/raw/refs/heads/main/env
+wget -O /opt/marzneshin/.env https://github.com/nationpwned/mz/raw/refs/heads/main/env
 # Download docker-compose.yml
-wget -O /opt/marzban/docker-compose.yml https://github.com/nationpwned/mz/raw/refs/heads/main/docker-compose.yml
+wget -O /opt/marzneshin/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/docker-compose.yml
 
 # Download nginx.conf
-wget -O /opt/marzban/nginx.conf https://raw.githubusercontent.com/nationpwned/mz/refs/heads/main/nginx.conf
+wget -O /opt/marzneshin/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/nginx.conf
 # Replace placeholders in nginx.conf with user input
-sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzban/nginx.conf
+sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzneshin/nginx.conf
 
 # Download xray_config.json
-wget -O /var/lib/marzban/xray_config.json https://github.com/nationpwned/mz/raw/refs/heads/main/xray_config.json
+wget -O /var/lib/marzneshin/xray_config.json https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/xray_config.json
 
-sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzban/xray_config.json
+sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzneshin/xray_config.json
 
-# Download the subscribers Marzban
-mkdir -p /var/lib/marzban/templates/subscription/
-wget -N -P /var/lib/marzban/templates/subscription/ https://github.com/nationpwned/mz/raw/refs/heads/main/index.html
+# Download the subscribers marzneshin
+mkdir -p /var/lib/marzneshin/templates/subscription/
+wget -N -P /var/lib/marzneshin/templates/subscription/ https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/index.html
 
 # Firewall configuration
 echo "Configuring firewall..."
@@ -141,13 +139,13 @@ ufw --force enable
 
 # Cloudflare Warp installation
 echo "Installing Cloudflare Warp..."
-docker compose -f /opt/marzban/docker-compose.yml up -d
+docker compose -f /opt/marzneshin/docker-compose.yml up -d
 
-# Ensure /opt/marzban/wgcf directory is fresh
-if [ -d /opt/marzban/wgcf ]; then
-  rm -rf /opt/marzban/wgcf
+# Ensure /opt/marzneshin/wgcf directory is fresh
+if [ -d /opt/marzneshin/wgcf ]; then
+  rm -rf /opt/marzneshin/wgcf
 fi
-mkdir -p /opt/marzban/wgcf
+mkdir -p /opt/marzneshin/wgcf
 
 # Download wgcf binary
 WGCF_LATEST_URL=$(curl -s https://api.github.com/repos/ViRb3/wgcf/releases/latest | grep "browser_download_url" | grep "linux_amd64" | cut -d '"' -f 4)
@@ -158,9 +156,9 @@ chmod +x /usr/local/bin/wgcf
 echo "Configuring Cloudflare Warp..."
 wgcf register --accept-tos
 wgcf generate
-mv wgcf-profile.conf /opt/marzban/wgcf/wg0.conf
-mv wgcf-account.toml /opt/marzban/wgcf/
-sed -i -E 's/, [0-9a-f:]+\/128//; s/, ::\/0//' /opt/marzban/wgcf/wg0.conf
+mv wgcf-profile.conf /opt/marzneshin/wgcf/wg0.conf
+mv wgcf-account.toml /opt/marzneshin/wgcf/
+sed -i -E 's/, [0-9a-f:]+\/128//; s/, ::\/0//' /opt/marzneshin/wgcf/wg0.conf
 sleep 3
 docker restart wgcf-warp
 sleep 5
@@ -186,8 +184,8 @@ echo "ShortIds: $SHORTIDS"
 echo "UUID: $XRAY_UUID"
 echo "==============================================="
 
-echo "Marzban installation and configuration completed successfully!"
-echo "You can access Marzban at https://$DOMAIN"
+echo "marzneshin installation and configuration completed successfully!"
+echo "You can access marzneshin at https://$DOMAIN"
 echo "Make sure to configure your Xray clients with the provided Reality keys and UUID."
 echo "==============================================="
 
@@ -200,4 +198,3 @@ if [[ "$answer" =~ ^[Yy]$ ]]; then
 else
   echo "Reboot cancelled. Please reboot manually if needed."
 fi
-
