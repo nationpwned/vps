@@ -40,9 +40,9 @@ else
 fi
 sysctl -p >/dev/null 2>&1
 
-rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
+rm -Rf /etc/opt/marzneshin >/dev/null 2>&1 || true
 # Install marzneshin
-rm -Rf /opt/marzneshin >/dev/null 2>&1 || true
+rm -Rf /etc/opt/marzneshin >/dev/null 2>&1 || true
 rm -Rf /var/lib/marzneshin >/dev/null 2>&1 || true
 
 bash -c "$(curl -sL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/marzneshin/marzneshin)" @ install --database mariadb
@@ -94,14 +94,14 @@ else
     chmod 644 "/var/lib/marzneshin/certs/fullchain.pem"
 fi
 
-wget -O /opt/marzneshin/.env https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/env
+wget -O /etc/opt/marzneshin/.env https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/env
 # Download docker-compose.yml
-wget -O /opt/marzneshin/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/docker-compose.yml
+wget -O /etc/opt/marzneshin/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/docker-compose.yml
 
 # Download nginx.conf
-wget -O /opt/marzneshin/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/nginx.conf
+wget -O /etc/opt/marzneshin/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/nginx.conf
 # Replace placeholders in nginx.conf with user input
-sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzneshin/nginx.conf
+sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /etc/opt/marzneshin/nginx.conf
 
 # Download xray_config.json
 wget -O /var/lib/marzneshin/xray_config.json https://github.com/nationpwned/vps/raw/refs/heads/marzneshin/xray_config.json
@@ -150,13 +150,13 @@ ufw --force enable
 
 # Cloudflare Warp installation
 echo "Installing Cloudflare Warp..."
-docker compose -f /opt/marzneshin/docker-compose.yml up -d
+docker compose -f /etc/opt/marzneshin/docker-compose.yml up -d
 
 # Ensure /opt/marzneshin/wgcf directory is fresh
-if [ -d /opt/marzneshin/wgcf ]; then
-  rm -rf /opt/marzneshin/wgcf
+if [ -d /etc/opt/marzneshin/wgcf ]; then
+  rm -rf /etc/opt/marzneshin/wgcf
 fi
-mkdir -p /opt/marzneshin/wgcf
+mkdir -p /etc/opt/marzneshin/wgcf
 
 # Download wgcf binary
 WGCF_LATEST_URL=$(curl -s https://api.github.com/repos/ViRb3/wgcf/releases/latest | grep "browser_download_url" | grep "linux_amd64" | cut -d '"' -f 4)
@@ -167,9 +167,9 @@ chmod +x /usr/local/bin/wgcf
 echo "Configuring Cloudflare Warp..."
 wgcf register --accept-tos
 wgcf generate
-mv wgcf-profile.conf /opt/marzneshin/wgcf/wg0.conf
-mv wgcf-account.toml /opt/marzneshin/wgcf/
-sed -i -E 's/, [0-9a-f:]+\/128//; s/, ::\/0//' /opt/marzneshin/wgcf/wg0.conf
+mv wgcf-profile.conf /etc/opt/marzneshin/wgcf/wg0.conf
+mv wgcf-account.toml /etc/opt/marzneshin/wgcf/
+sed -i -E 's/, [0-9a-f:]+\/128//; s/, ::\/0//' /etc/opt/marzneshin/wgcf/wg0.conf
 sleep 3
 docker restart wgcf-warp
 sleep 5
