@@ -59,13 +59,13 @@ services:
       - PGID=1000
       - TZ=Asia/Jakarta
     volumes:
-      - /opt/marzban/wgcf:/config
+      - /etc/opt/marzneshin/wgcf:/config
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     restart: always
     networks:
-      - marzban-net
+      - marzneshin-net
 
 networks:
-  marzban-net:
+  marzneshin-net:
     driver: bridge
