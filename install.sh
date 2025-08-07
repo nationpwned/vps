@@ -56,7 +56,7 @@ marzban cli admin create --sudo
 
 # Generate Reality keys
 echo "Generating Reality keys..."
-docker exec marzban-marznode-1 xray x25519 genkey > /$HOME/reality.txt
+docker exec marzban-marzban-1 xray x25519 genkey > /$HOME/reality.txt
 PRIVATE_KEY=$(grep -oP 'Private key: \K\S+' /$HOME/reality.txt)
 PUBLIC_KEY=$(grep -oP 'Public key: \K\S+' /$HOME/reality.txt)
 
@@ -67,7 +67,7 @@ SHORTIDS=$(cat /$HOME/shortIds.txt)
 
 # Generating uuid for Reality
 echo "Generating UUID for Reality..."
-if ! docker ps | grep -q marzban-marznode-1; then
+if ! docker ps | grep -q marzban-marzban-1; then
   echo "marzban container not running! Exiting."
   exit 1
 fi
