@@ -162,7 +162,7 @@ wget "$WGCF_LATEST_URL" -O /usr/local/bin/wgcf
 chmod +x /usr/local/bin/wgcf
 # Configure Cloudflare Warp
 echo "Configuring Cloudflare Warp..."
-wgcf register --accept-tos > /dev/null 2>&1
+wgcf register --accept-tos || true > /dev/null 2>&1
 wgcf generate
 mv wgcf-profile.conf /opt/marzban/wgcf/wg0.conf
 mv wgcf-account.toml /opt/marzban/wgcf/
