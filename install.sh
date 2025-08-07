@@ -40,10 +40,10 @@ else
 fi
 sysctl -p >/dev/null 2>&1
 
-rm -Rf /opt/marzban >/dev/null 2>&1 || true
-# Install marzban
-rm -Rf /opt/marzban >/dev/null 2>&1 || true
-rm -Rf /var/lib/marzban >/dev/null 2>&1 || true
+if command -v marzban >/dev/null 2>&1; then
+  echo "Existing marzban installation detected. Uninstalling..."
+  marzban uninstall
+fi
 
 bash -c "$(curl -sL https://github.com/nationpwned/vps/raw/refs/heads/marzban/marzban)" @ install
 sleep 50
@@ -71,7 +71,7 @@ if ! docker ps | grep -q marzban-marzban-1; then
   echo "marzban container not running! Exiting."
   exit 1
 fi
-docker exec marzban-marznode-1 xray uuid > /$HOME/xray_uuid.txt
+docker exec marzban-marzban-1 xray uuid > /$HOME/xray_uuid.txt
 XRAY_UUID=$(cat /$HOME/xray_uuid.txt)
 if [[ -z "$XRAY_UUID" ]]; then
   echo "Failed to generate UUID. Exiting."
