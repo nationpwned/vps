@@ -38,6 +38,14 @@ if sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
 else
   echo "Failed to enable BBR."
 fi
+
+sysctl -w net.mptcp.enabled=1
+if sysctl net.mptcp.enabled | grep -q "net.mptcp.enabled = 1"; then
+  echo "MPTCP has been enabled."
+else
+  echo "Failed to enable MPTCP."
+fi
+
 sysctl -p >/dev/null 2>&1
 
 if command -v marzban >/dev/null 2>&1; then
