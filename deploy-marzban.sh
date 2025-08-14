@@ -744,7 +744,7 @@ EOF
 
 hook_postinstall() {
     mv /opt/marzban/app/templates/subscription/index.html /opt/marzban/app/templates/subscription/index.html.bak
-    wget https://github.com/nationpwned/mz/raw/refs/heads/next/index.html -O /opt/marzban/app/templates/subscription/index.html
+    wget https://github.com/nationpwned/vps/raw/refs/heads/marzban-next/index.html -O /opt/marzban/app/templates/subscription/index.html
     sudo tee /etc/systemd/system/marzban.service > /dev/null << 'EOF'
 [Unit]
 Description=Marzban VPN Management Panel
