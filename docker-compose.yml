@@ -5,8 +5,8 @@ services:
     env_file: .env
     volumes:
       - /var/lib/marzban:/var/lib/marzban
-      - /opt/marzban/assets/geosite.dat:/usr/local/bin/geosite.dat
-      - /opt/marzban/assets/geoip.dat:/usr/local/bin/geoip.dat
+      - /var/lib/marzban/geosite.dat:/usr/local/bin/geosite.dat
+      - /var/lib/marzban/geoip.dat:/usr/local/bin/geoip.dat
     ports:
       - "8000:8000"
     networks:
