@@ -53,7 +53,7 @@ if command -v marzban >/dev/null 2>&1; then
   marzban uninstall
 fi
 
-bash -c "$(curl -sL https://github.com/nationpwned/vps/raw/refs/heads/marzban/marzban)" @ install
+bash -c "$(curl -sL https://github.com/nationpwned/vps/raw/refs/heads/marzban-nowarp/marzban)" @ install
 sleep 50
 
 marzban cli admin create --sudo
@@ -102,23 +102,23 @@ else
     chmod 644 "/var/lib/marzban/certs/fullchain.pem"
 fi
 
-wget -O /opt/marzban/.env https://github.com/nationpwned/vps/raw/refs/heads/marzban/env
+wget -O /opt/marzban/.env https://github.com/nationpwned/vps/raw/refs/heads/marzban-nowarp/env
 # Download docker-compose.yml
-wget -O /opt/marzban/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/marzban/docker-compose.yml
+wget -O /opt/marzban/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/marzban-nowarp/docker-compose.yml
 
 # Download nginx.conf
-wget -O /opt/marzban/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/marzban/nginx.conf
+wget -O /opt/marzban/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/marzban-nowarp/nginx.conf
 # Replace placeholders in nginx.conf with user input
 sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzban/nginx.conf
 
 # Download xray_config.json
-wget -O /var/lib/marzban/xray_config.json https://github.com/nationpwned/vps/raw/refs/heads/marzban/xray_config.json
+wget -O /var/lib/marzban/xray_config.json https://github.com/nationpwned/vps/raw/refs/heads/marzban-nowarp/xray_config.json
 
 sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzban/xray_config.json
 
 # Download the subscribers marzban
 mkdir -p /var/lib/marzban/templates/subscription/
-wget -N -P /var/lib/marzban/templates/subscription/ https://github.com/nationpwned/vps/raw/refs/heads/marzban/index.html
+wget -N -P /var/lib/marzban/templates/subscription/ https://github.com/nationpwned/vps/raw/refs/heads/marzban-nowarp/index.html
 
 # Firewall configuration
 echo "Configuring firewall..."
