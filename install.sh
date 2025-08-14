@@ -153,46 +153,6 @@ ufw allow 62051/tcp
 
 ufw --force enable
 
-# Cloudflare Warp installation
-echo "Installing Cloudflare Warp..."
-docker compose -f /opt/marzban/docker-compose.yml up -d
-
-# Ensure /opt/marzban/wgcf directory is fresh
-if [ -d /opt/marzban/wgcf ]; then
-  rm -rf /opt/marzban/wgcf
-fi
-mkdir -p /opt/marzban/wgcf
-
-# Download wgcf binary
-WGCF_LATEST_URL=$(curl -s https://api.github.com/repos/ViRb3/wgcf/releases/latest | grep "browser_download_url" | grep "linux_amd64" | cut -d '"' -f 4)
-wget "$WGCF_LATEST_URL" -O /usr/local/bin/wgcf
-
-chmod +x /usr/local/bin/wgcf
-# Configure Cloudflare Warp
-echo "Configuring Cloudflare Warp..."
-wgcf register --accept-tos || true > /dev/null 2>&1
-wgcf generate
-mv wgcf-profile.conf /opt/marzban/wgcf/wg0.conf
-mv wgcf-account.toml /opt/marzban/wgcf/
-sed -i -E 's/, [0-9a-f:]+\/128//; s/, ::\/0//' /opt/marzban/wgcf/wg0.conf
-sleep 3
-docker restart wgcf-warp
-sleep 5
-
-echo "==============================================="
-# Check Cloudflare Warp status (Cloudflare and ip-api.com)
-if docker exec wgcf-warp curl -s https://www.cloudflare.com/cdn-cgi/trace | grep -q "warp=on"; then
-    echo "Cloudflare Warp is ON (Cloudflare trace)."
-else
-    echo "Cloudflare Warp is OFF (Cloudflare trace)."
-fi
-
-if docker exec wgcf-warp curl -s http://ip-api.com/json | grep -q 'Cloudflare WARP'; then
-    echo "Cloudflare Warp is ON (ip-api.com check)."
-else
-    echo "Cloudflare Warp is OFF or not detected by ip-api.com."
-fi
-
 echo "==============================================="
 echo "private key: $PRIVATE_KEY"
 echo "public key: $PUBLIC_KEY"
