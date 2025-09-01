@@ -6,7 +6,7 @@ const CONFIG = {
   BACKEND_URL: 'https://YOUR-DOMAIN.COM',
   RATE_LIMIT: {
     MAX_REQUESTS: 100,
-    WINDOW_MS: 60 * 1000, // 1 minute
+    WINDOW_MS: 60 * 1000,
   },
 };
 
@@ -63,7 +63,7 @@ async function validateRequest(request) {
 
   // Relaxed gRPC validation
   const contentType = request.headers.get('content-type') || '';
-  const isGrpc = contentType.includes('application/grpc') || contentType.includes('application/octet-stream'); // Fallback for some clients
+  const isGrpc = contentType.includes('application/grpc') || contentType.includes('application/octet-stream');
   if (!isGrpc) {
     console.warn('Non-gRPC content-type:', contentType);
   }
