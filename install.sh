@@ -54,11 +54,13 @@ if command -v pasarguard >/dev/null 2>&1; then
   pasarguard uninstall
 fi
 
-bash -c "$(curl -sL https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/pasarguard)" @ install
+bash -c "$(curl -sL http://raw.githubusercontent.com/nationpwned/vps/refs/heads/Pasarguard/install.sh)" @ install --pre-release
 sleep 50
 
 pasarguard cli admins --create $ADMIN
+sleep 5
 pasarguard cli admins --modify $ADMIN
+sleep 5
 
 # Install Certificate using acme.sh
 bash -c "curl https://get.acme.sh | sh -s email=$MAIL"
