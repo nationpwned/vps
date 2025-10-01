@@ -3,7 +3,7 @@
 - curl -fsSL https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/install.sh -o install.sh
   
 - chmod +x install.sh
-- 
+
 - sudo su -c "./install.sh"
 
 - copy xray_config.json into Nodes > Cores > Default Core Configs
