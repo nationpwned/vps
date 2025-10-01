@@ -57,8 +57,8 @@ fi
 bash -c "$(curl -sL https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/pasarguard)" @ install
 sleep 50
 
-pasarguard cli admins create $ADMIN
-
+pasarguard cli admins --create $ADMIN
+pasarguard cli admins --modify $ADMIN
 
 # Install Certificate using acme.sh
 bash -c "curl https://get.acme.sh | sh -s email=$MAIL"
@@ -71,32 +71,30 @@ chmod 600 "/var/lib/pasarguard/key.pem"
 chmod 644 "/var/lib/pasarguard/fullchain.pem"
 
 wget -O /opt/pasarguard/.env https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/env
+
 # Download docker-compose.yml
 wget -O /opt/pasarguard/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/docker-compose.yml
 
 # Download nginx.conf
 wget -O /opt/pasarguard/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/nginx.conf
+
 # Replace placeholders in nginx.conf with user input
 sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/pasarguard/nginx.conf
 
 # Download xray_config.json
 wget -O /var/lib/pasarguard/xray_config.json https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/xray_config.json
 
-sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/pasarguard/xray_config.json
-
 # Download the subscribers pasarguard
 mkdir -p /var/lib/pasarguard/templates/subscription/
 wget -N -P /var/lib/pasarguard/templates/subscription/ https://github.com/nationpwned/vps/raw/refs/heads/pasarguard/index.html
 
-# Cloudflare Warp installation
-echo "Installing Cloudflare Warp..."
+# pasarguard up
 docker compose -f /opt/pasarguard/docker-compose.yml up -d
 
 echo "pasarguard installation and configuration completed successfully!"
 echo "You can access pasarguard at https://$DOMAIN"
 echo "Make sure to configure your Xray clients with the provided Reality keys and UUID."
 echo "==============================================="
-
 
 read -p "Do you want to reboot now? [Y/n]: " answer
 answer=${answer:-Y}
