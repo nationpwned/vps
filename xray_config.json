@@ -1,4 +1,3 @@
-
 {
   "log": {
     "loglevel": "warning"
@@ -18,14 +17,6 @@
         "outboundTag": "blocked",
         "domain": [
           "geosite:category-ads-all"
-        ]
-      },
-      {
-        "type": "field",
-        "outboundTag": "warp",
-        "ip": [
-          "0.0.0.0/0",
-          "::/0"
         ]
       }
     ]
@@ -142,26 +133,119 @@
         }
       },
       "tag": "trojan-grpc-tls"
+    },
+    {
+      "port": 2025,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "9b93dc93-197a-42be-968c-4c25e855ef7f"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
+            }
+          ]
+        },
+        "httpupgradeSettings": {
+          "path": "/vless-httpupgrade"
+        }
+      },
+      "tag": "vless-httpupgrade-tls"
+    },
+    {
+      "port": 2026,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          {
+            "password": "9b93dc93-197a-42be-968c-4c25e855ef7f"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
+            }
+          ]
+        },
+        "httpupgradeSettings": {
+          "path": "/trojan-httpupgrade"
+        }
+      },
+      "tag": "trojan-httpupgrade-tls"
+    },
+    {
+      "port": 2027,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "9b93dc93-197a-42be-968c-4c25e855ef7f"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
+            }
+          ]
+        },
+        "xhttpSettings": {
+          "path": "/vless-xhttp"
+        }
+      },
+      "tag": "vless-xhttp-tls"
+    },
+    {
+      "port": 2028,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          {
+            "password": "9b93dc93-197a-42be-968c-4c25e855ef7f"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
+            }
+          ]
+        },
+        "xhttpSettings": {
+          "path": "/trojan-xhttp"
+        }
+      },
+      "tag": "trojan-xhttp-tls"
     }
   ],
   "outbounds": [
-    {
-      "protocol": "wireguard",
-      "settings": {
-        "secretKey": "ADk7r1IU8bpZOUMTSFA2obhawuPVUgM2JQRuuGXGrX0=",
-        "address": [
-          "172.16.0.2/32"
-        ],
-        "peers": [
-          {
-            "publicKey": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-            "endpoint": "engage.cloudflareclient.com:2408"
-          }
-        ],
-        "mtu": 1280
-      },
-      "tag": "warp"
-    },
     {
       "protocol": "freedom",
       "tag": "direct"
