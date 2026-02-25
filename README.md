@@ -23,6 +23,23 @@
       v2ray-http-upgrade: true
     udp: true
 
+  - name: VLESS-httpupgrade
+    server: google.com
+    port: 443
+    type: vless
+    uuid: 2cbf46b4-8efa-405d-be5f-d3505898885b
+    cipher: auto
+    tls: true
+    skip-cert-verify: true
+    servername: google.com
+    network: ws
+    ws-opts:
+      path: /vless-httpupgrade
+      headers:
+        Host: google.com
+      v2ray-http-upgrade: true
+    udp: true
+
   - name: Trojan-xhttp
     server: google.com
     port: 443
@@ -59,20 +76,4 @@
         noGRPCHeader: false
     udp: true
 
-  - name: VLESS-httpupgrade
-    server: google.com
-    port: 443
-    type: vless
-    uuid: 2cbf46b4-8efa-405d-be5f-d3505898885b
-    cipher: auto
-    tls: true
-    skip-cert-verify: true
-    servername: google.com
-    network: ws
-    ws-opts:
-      path: /vless-httpupgrade
-      headers:
-        Host: google.com
-      v2ray-http-upgrade: true
-    udp: true
 ```
