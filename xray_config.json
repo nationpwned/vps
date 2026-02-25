@@ -1,6 +1,6 @@
 {
   "log": {
-    "loglevel": "warning"
+    "loglevel": "info"
   },
   "dns": {
     "servers": [
@@ -133,6 +133,61 @@
         }
       },
       "tag": "trojan-grpc-tls"
+    },
+    {
+      "port": 2025,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "9b93dc93-197a-42be-968c-4c25e855ef7f"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
+            }
+          ]
+        },
+        "httpupgradeSettings": {
+          "path": "/vless-httpupgrade"
+        }
+      },
+      "tag": "vless-httpupgrade-tls"
+    },
+    {
+      "port": 2026,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          {
+            "password": "9b93dc93-197a-42be-968c-4c25e855ef7f"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/var/lib/marzban/certs/fullchain.pem",
+              "keyFile": "/var/lib/marzban/certs/key.pem"
+            }
+          ]
+        },
+        "httpupgradeSettings": {
+          "path": "/trojan-httpupgrade"
+        }
+      },
+      "tag": "trojan-httpupgrade-tls"
     }
   ],
   "outbounds": [
