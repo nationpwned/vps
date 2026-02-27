@@ -15,9 +15,9 @@ echo "================================="
 if [ -f /usr/bin/badvpn-udpgw ]; then
   echo "BadVPN binary already exists, skipping installation..."
 else
-  echo "Downloading BadVPN binaries..."
   apt update -y
   apt install python3-full -y
+  echo "Downloading BadVPN binaries..."
 
   # Setup Domain
   echo "===== SETUP DOMAIN ====="
@@ -116,8 +116,15 @@ else
   BUG="support.zoom.us"
   SNI="${BUG}.@${DOMAIN}"
 
-  HOME_DIR=$(eval echo ~${SUDO_USER:-$USER})
-  OUT_DIR="${HOME_DIR}/sshvpn/user"
+  ACTUAL_USER="${SUDO_USER:-$USER}"
+  if [ "$ACTUAL_USER" == "root" ]; then
+    HOME_DIR="/root"
+  else
+    HOME_DIR=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
+  fi
+  
+  # Jika file sshvpn (script) tanpa sengaja menghalangi pembuatan folder, tangani
+  OUT_DIR="${HOME_DIR}/client"
   mkdir -p "$OUT_DIR"
   OUT_FILE="${OUT_DIR}/${user}.txt"
 
