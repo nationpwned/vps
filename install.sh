@@ -115,16 +115,8 @@ else
   
   BUG="support.zoom.us"
   SNI="${BUG}.@${DOMAIN}"
-
-  ACTUAL_USER="${SUDO_USER:-$USER}"
-  if [ "$ACTUAL_USER" == "root" ]; then
-    HOME_DIR="/root"
-  else
-    HOME_DIR=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
-  fi
   
-  # Jika file sshvpn (script) tanpa sengaja menghalangi pembuatan folder, tangani
-  OUT_DIR="${HOME_DIR}/client"
+  OUT_DIR="/home/${USER}/client"
   mkdir -p "$OUT_DIR"
   OUT_FILE="${OUT_DIR}/${user}.txt"
 
