@@ -16,6 +16,8 @@ if [ -f /usr/bin/badvpn-udpgw ]; then
   echo "BadVPN binary already exists, skipping installation..."
 else
   echo "Downloading BadVPN binaries..."
+  apt update -y
+  apt install python3-full -y
 
   # Setup Domain
   echo "===== SETUP DOMAIN ====="
@@ -81,39 +83,44 @@ else
   if [[ -z "$days" || "$days" == "0" ]]; then
     exp="2099-12-31"
     exp_label="Unlimited"
-    # Menggunakan perintah chage jika unlimited, atau kita bisa tetap pakai useradd -e
-    useradd -e $exp -s /bin/false -M $user
+    useradd -e $exp -s /bin/false -m $user
   else
     exp=$(date -d "$days days" +"%Y-%m-%d")
     exp_label="$exp"
-    useradd -e $exp -s /bin/false -M $user
+    useradd -e $exp -s /bin/false -m $user
   fi
 
   echo "$user:$pass" | chpasswd
+
+  USER_HOME="/home/$user"
+  mkdir -p "$USER_HOME/.ssh"
+  ssh-keygen -t rsa -b 2048 -f "$USER_HOME/.ssh/id_rsa" -q -N ""
   
-  # Ambil IP Public VPS
+  cat "$USER_HOME/.ssh/id_rsa.pub" >> "$USER_HOME/.ssh/authorized_keys"
+  chmod 700 "$USER_HOME/.ssh"
+  chmod 600 "$USER_HOME/.ssh/authorized_keys"
+  chown -R $user:$user "$USER_HOME/.ssh"
+
+  PRIVATE_KEY=$(cat "$USER_HOME/.ssh/id_rsa")
+  
+  HOST_KEY=$(awk '{print $1" "$2}' /etc/ssh/ssh_host_rsa_key.pub 2>/dev/null)
+  
   MYIP=$(curl -sS ipv4.icanhazip.com)
   
-  # Ambil Domain dari Instalasi
   if [ -f /etc/sshvpn_domain ]; then
     DOMAIN=$(cat /etc/sshvpn_domain)
   else
     DOMAIN=$MYIP
   fi
   
-  # Setup Bug SNI
   BUG="support.zoom.us"
   SNI="${BUG}.@${DOMAIN}"
 
-  # Tentukan folder output
-  # Menggunakan SUDO_USER agar tersimpan di home folder user asli pemanggil script, bukan di /root/ jika pakai sudo.
-  # Jika SUDO_USER kosong, gunakan USER biasa (root).
   HOME_DIR=$(eval echo ~${SUDO_USER:-$USER})
   OUT_DIR="${HOME_DIR}/sshvpn/user"
   mkdir -p "$OUT_DIR"
   OUT_FILE="${OUT_DIR}/${user}.txt"
 
-  # Buat format text
   CONFIG_TXT="User created successfully
 -------------------------
 Username   : $user
@@ -128,10 +135,7 @@ Port UDPGW : 7300
 Bug / Host : $BUG
 SNI / SN   : $SNI
 -------------------------
-Payload WS / HTTP Custom:
-$SNI:22@$user:$pass
--------------------------
-Config Mihomo (Clash Meta):
+Config Mihomo (Clash Meta) with Private/Host Key:
 proxies:
   - name: SSH-$user
     type: ssh
@@ -139,10 +143,15 @@ proxies:
     port: 22
     username: $user
     password: $pass
+    private-key: |
+$(echo "$PRIVATE_KEY" | sed 's/^/      /')
+    host-key:
+      - \"$HOST_KEY\"
+    host-key-algorithms:
+      - ssh-rsa
     udp: true
 -------------------------"
 
-  # Tampilkan ke terminal dan simpan ke file
   echo "$CONFIG_TXT" | tee "$OUT_FILE"
   echo ""
   echo "=> Config tersimpan di: $OUT_FILE"
