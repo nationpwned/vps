@@ -17,6 +17,13 @@ if [ -f /usr/bin/badvpn-udpgw ]; then
 else
   echo "Downloading BadVPN binaries..."
 
+  # Setup Domain
+  echo "===== SETUP DOMAIN ====="
+  read -p "Masukkan Domain/Subdomain: " DOMAIN
+  echo "$DOMAIN" > /etc/sshvpn_domain
+  echo "Domain $DOMAIN berhasil disimpan."
+  echo ""
+
   wget -O /usr/bin/badvpn-client https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-client
   wget -O /usr/bin/badvpn-flooder https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-flooder
   wget -O /usr/bin/badvpn-ncd https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-ncd
@@ -69,16 +76,76 @@ if id "$user" &>/dev/null; then
   echo "Error: User '$user' already exists!"
 else
   read -p "Password: " pass
-  read -p "Expired (days): " days
+  read -p "Expired (days) [kosongkan untuk unlimited]: " days
 
-  exp=$(date -d "$days days" +"%Y-%m-%d")
+  if [[ -z "$days" || "$days" == "0" ]]; then
+    exp="2099-12-31"
+    exp_label="Unlimited"
+    # Menggunakan perintah chage jika unlimited, atau kita bisa tetap pakai useradd -e
+    useradd -e $exp -s /bin/false -M $user
+  else
+    exp=$(date -d "$days days" +"%Y-%m-%d")
+    exp_label="$exp"
+    useradd -e $exp -s /bin/false -M $user
+  fi
 
-  useradd -e $exp -s /bin/false -M $user
   echo "$user:$pass" | chpasswd
+  
+  # Ambil IP Public VPS
+  MYIP=$(curl -sS ipv4.icanhazip.com)
+  
+  # Ambil Domain dari Instalasi
+  if [ -f /etc/sshvpn_domain ]; then
+    DOMAIN=$(cat /etc/sshvpn_domain)
+  else
+    DOMAIN=$MYIP
+  fi
+  
+  # Setup Bug SNI
+  BUG="support.zoom.us"
+  SNI="${BUG}.@${DOMAIN}"
 
-  echo "User created successfully"
-  echo "Username : $user"
-  echo "Expired  : $exp"
+  # Tentukan folder output
+  # Menggunakan SUDO_USER agar tersimpan di home folder user asli pemanggil script, bukan di /root/ jika pakai sudo.
+  # Jika SUDO_USER kosong, gunakan USER biasa (root).
+  HOME_DIR=$(eval echo ~${SUDO_USER:-$USER})
+  OUT_DIR="${HOME_DIR}/sshvpn/user"
+  mkdir -p "$OUT_DIR"
+  OUT_FILE="${OUT_DIR}/${user}.txt"
+
+  # Buat format text
+  CONFIG_TXT="User created successfully
+-------------------------
+Username   : $user
+Password   : $pass
+Expired    : $exp_label
+-------------------------
+Host/IP    : $MYIP
+Domain     : $DOMAIN
+Port SSH   : 22
+Port UDPGW : 7300
+-------------------------
+Bug / Host : $BUG
+SNI / SN   : $SNI
+-------------------------
+Payload WS / HTTP Custom:
+$SNI:22@$user:$pass
+-------------------------
+Config Mihomo (Clash Meta):
+proxies:
+  - name: SSH-$user
+    type: ssh
+    server: $SNI
+    port: 22
+    username: $user
+    password: $pass
+    udp: true
+-------------------------"
+
+  # Tampilkan ke terminal dan simpan ke file
+  echo "$CONFIG_TXT" | tee "$OUT_FILE"
+  echo ""
+  echo "=> Config tersimpan di: $OUT_FILE"
 fi
 
 }
