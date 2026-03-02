@@ -207,7 +207,7 @@ proxies:
       v2ray-http-upgrade: true
     udp: true
 
-- name: $USER-vless-xhttp
+  - name: $USER-vless-xhttp
     type: vless
     server: $DOMAIN
     port: 443
