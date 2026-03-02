@@ -162,16 +162,19 @@ add_user() {
     
     # Generate Sub File (Raw Links)
     cat <<EOF > $SUB_DIR/$USERNAME
-vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-vws
-vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-vgrpc
-vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-vupgrade
-vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USERNAME-xhttp
+vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-vless-ws
+vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-vless-grpc
+vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-vless-upgrade
+vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USERNAME-vless-xhttp
 trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USERNAME-trojan-ws
 trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USERNAME-trojan-grpc
 EOF
     systemctl restart xray
     show_links "$USERNAME" "$UUID" "$PASS"
 }
+
+COUNTRY_CODE=$(curl -s https://api.ip.sb/geoip -4 | jq -r '.country_code')
+
 
 show_links() {
     local USER=$1; local UUID=$2; local PASS=$3; local DOMAIN=$(cat $DOMAIN_FILE)
@@ -186,17 +189,17 @@ show_links() {
     echo -e "╠══════════════════════════════════════════════════════════╣"
     echo -e "  ${CYAN}RAW PROTOCOL LINKS (MANUAL IMPORT)${NC}"
     echo -e "  ${NC}────────────────────────────────────────────────────────"
-    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USER-VLESS-WS"
-    echo -e "  vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USER-VLESS-GRPC"
-    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USER-XHTTP"
-    echo -e "  trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USER-TROJAN-WS"
-    echo -e "  trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USER-TROJAN-GRPC"
+    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#VLESS-WS"
+    echo -e "  vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#VLESS-GRPC"
+    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#VLESS-XHTTP"
+    echo -e "  trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#TROJAN-WS"
+    echo -e "  trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#TROJAN-GRPC"
     echo -e "╠══════════════════════════════════════════════════════════╣"
     echo -e "  ${CYAN}MIHOMO / CLASH META YAML CONFIGURATION${NC}"
     echo -e "  ${NC}────────────────────────────────────────────────────────"
     cat <<EOF
 proxies:
-  - name: $USER-vless-ws-SG
+  - name: vless-ws-${COUNTRY_CODE}
     server: support.zoom.us
     port: 443
     type: vless
@@ -204,7 +207,7 @@ proxies:
     cipher: auto
     tls: true
     skip-cert-verify: true
-    servername: zoomgov.sibondt.my.id
+    servername: $DOMAIN
     network: ws
     ws-opts:
       path: /vless-ws
@@ -212,7 +215,7 @@ proxies:
         Host: $DOMAIN
     udp: true
 
-  - name: $USER-vless-grpc-SG
+  - name: vless-grpc-${COUNTRY_CODE}
     type: vless
     server: support.zoom.us
     port: 443
@@ -225,7 +228,7 @@ proxies:
       grpc-service-name: vless-grpc
     udp: true
 
-  - name: $USER-vless-upgrade-SG
+  - name: vless-upgrade-${COUNTRY_CODE}
     server: support.zoom.us
     port: 443
     type: vless
@@ -233,7 +236,7 @@ proxies:
     uuid: $UUID
     cipher: auto
     tls: true
-    servername: zoomgov.sibondt.my.id
+    servername: $DOMAIN
     network: ws
     ws-opts:
       path: /vless-upgrade
@@ -242,7 +245,7 @@ proxies:
       v2ray-http-upgrade: true
     udp: true
 
-  - name: $USER-vless-xhttp-SG
+  - name: vless-xhttp-${COUNTRY_CODE}
     type: vless
     server: support.zoom.us
     port: 443
@@ -251,7 +254,7 @@ proxies:
     tls: true
     udp: true
     skip-cert-verify: true
-    servername: zoomgov.sibondt.my.id
+    servername: $DOMAIN
     network: xhttp
     xhttp-opts:
       path: /xhttp
@@ -260,13 +263,13 @@ proxies:
         headers:
           Host: $DOMAIN
 
-  - name: $USER-trojan-ws-SG
+  - name: trojan-ws-${COUNTRY_CODE}
     server: support.zoom.us
     port: 443
     type: trojan
     password: $PASS
     skip-cert-verify: true
-    sni: zoomgov.sibondt.my.id
+    sni: $DOMAIN
     tls: true
     network: ws
     ws-opts:
@@ -275,13 +278,13 @@ proxies:
         Host: $DOMAIN
     udp: true
 
-  - name: $USER-trojan-upgrade-SG
+  - name: trojan-upgrade-${COUNTRY_CODE}
     server: support.zoom.us
     port: 443
     type: trojan
     password: $PASS
     skip-cert-verify: true
-    sni: zoomgov.sibondt.my.id
+    sni: $DOMAIN
     tls: true
     network: ws
     ws-opts:
@@ -291,7 +294,7 @@ proxies:
       v2ray-http-upgrade: true
     udp: true
 
-  - name: $USER-trojan-grpc-SG
+  - name: trojan-grpc-${COUNTRY_CODE}
     type: trojan
     server: support.zoom.us
     port: 443
