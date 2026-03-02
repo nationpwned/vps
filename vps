@@ -128,13 +128,13 @@ add_user() {
     
     # Sub file with raw links
     cat <<EOF > $SUB_DIR/$USERNAME
-vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-VWS
-vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-VGRPC
-vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-VUPG
-vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USERNAME-XHTTP
-trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USERNAME-TWS
-trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USERNAME-TGRPC
-trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-upgrade&security=tls&type=httpupgrade#$USERNAME-TUPG
+vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-vless-es
+vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-vless-grpc
+vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-vless-upgrade
+vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USERNAME-xhttp
+trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USERNAME-trojan-ws
+trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USERNAME-trojan-grpc
+trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-upgrade&security=tls&type=httpupgrade#$USERNAME-trojan-upgrade
 EOF
 
     systemctl restart xray
