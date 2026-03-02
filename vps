@@ -1,10 +1,12 @@
 #!/bin/bash
 
+# Path Konfigurasi
 CONFIG_XRAY="/usr/local/etc/xray/config.json"
 CONFIG_NGINX="/etc/nginx/sites-available/xray"
 NGINX_LINK="/etc/nginx/sites-enabled/xray"
 DOMAIN_FILE="/usr/local/etc/xray/domain.txt"
 
+# Definisi Warna (UI)
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -14,27 +16,29 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-setup_firewall() {
-    echo -e "${YELLOW}Mengonfigurasi Firewall (UFW)...${NC}"
-    apt update && apt install -y ufw
+# 1. Setup Firewall & Dependencies
+setup_env() {
+    echo -e "${YELLOW}Mengonfigurasi Firewall & Dependencies...${NC}"
+    apt update && apt install -y ufw nginx jq curl socat certbot python3-certbot-nginx openssl
     ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp
     echo "y" | ufw enable
 }
 
+# 2. Fungsi Reinstall (Pembersihan Total)
 reinstall_script() {
     clear
     echo -e "${RED}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${RED}│${NC}                ${WHITE}WARNING: REINSTALL SYSTEM${NC}                 ${RED}│${NC}"
-    echo -e "${RED}├──────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${RED}│${NC} Semua data user, SSL, dan konfigurasi akan DIHAPUS!     ${RED}│${NC}"
-    echo -e "${RED}└──────────────────────────────────────────────────────────┘${NC}"
+    echo -e "│                ${WHITE}WARNING: REINSTALL SYSTEM${NC}                 │"
+    echo -e "├──────────────────────────────────────────────────────────┤"
+    echo -e "│ Semua data user, SSL, dan konfigurasi akan DIHAPUS!     │"
+    echo -e "└──────────────────────────────────────────────────────────┘"
     read -p "  Apakah Anda yakin? (y/n): " confirm
     if [[ $confirm == [yY] ]]; then
-        echo -e "${YELLOW}Membersihkan sistem...${NC}"
         systemctl stop xray nginx 2>/dev/null
         rm -rf /usr/local/etc/xray/
         rm -f $CONFIG_NGINX $NGINX_LINK
-        echo -e "${GREEN}Pembersihan selesai. Memulai instalasi ulang...${NC}"
+        rm -rf /etc/systemd/system/xray.service.d
+        echo -e "${GREEN}Pembersihan selesai. Mengulang instalasi...${NC}"
         sleep 2
         install_all
     else
@@ -42,33 +46,35 @@ reinstall_script() {
     fi
 }
 
+# 3. Proses Instalasi Utama
 install_all() {
     clear
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC}                ${WHITE}INITIAL INSTALLATION${NC}                  ${CYAN}│${NC}"
-    echo -e "${CYAN}└──────────────────────────────────────────────────────────┘${NC}"
+    echo -e "│                ${WHITE}INITIAL INSTALLATION${NC}                  │"
+    echo -e "└──────────────────────────────────────────────────────────┘"
     
     read -p "  Masukkan Domain Anda : " DOMAIN
     read -p "  Masukkan Email SSL   : " EMAIL
     if [[ -z "$DOMAIN" || -z "$EMAIL" ]]; then echo -e "${RED}Error: Data tidak lengkap!${NC}"; exit 1; fi
     
-    setup_firewall
+    setup_env
     systemctl stop apache2 2>/dev/null && apt remove -y apache2 2>/dev/null
 
-    echo -e "\n${YELLOW}Installing Xray-core & Nginx...${NC}"
-    apt update && apt install -y nginx jq curl socat certbot python3-certbot-nginx
+    echo -e "${YELLOW}Installing Xray-core...${NC}"
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 
+    # Generate Admin Awal
     mkdir -p /usr/local/etc/xray/
+    ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
+    ADMIN_PASS=$(openssl rand -hex 6)
 
+    # Nginx SSL & Proxy Setup
     cat <<EOF > $CONFIG_NGINX
 server { listen 80; server_name $DOMAIN; root /var/www/html; }
 EOF
     ln -sf $CONFIG_NGINX $NGINX_LINK
     rm -f /etc/nginx/sites-enabled/default 2>/dev/null
     systemctl restart nginx
-
-    echo -e "${YELLOW}Mengurus Sertifikat SSL...${NC}"
     certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
 
     cat <<EOF > $CONFIG_NGINX
@@ -88,38 +94,59 @@ server {
 }
 EOF
 
-NEW_UUID=$(cat /proc/sys/kernel/random/uuid)
-NEW_PASS=$(openssl rand -hex 6)
-
-sudo cat <<EOF > /usr/local/etc/xray/config.json
+    # Xray JSON Config
+    cat <<EOF > $CONFIG_XRAY
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
-    { "port": 10001, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless-ws" } } },
-    { "port": 10002, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$NEW_PASS", "email": "admin"}] }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan-ws" } } },
-    { "port": 10003, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } } },
-    { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$NEW_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
-    { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
-    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$NEW_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
-    { "port": 10007, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "xhttp", "xhttpSettings": { "path": "/xhttp" } } }
+    { "port": 10001, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless-ws" } } },
+    { "port": 10002, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan-ws" } } },
+    { "port": 10003, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } } },
+    { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
+    { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
+    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
+    { "port": 10007, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "xhttp", "xhttpSettings": { "path": "/xhttp" } } }
   ],
   "outbounds": [{ "protocol": "freedom" }]
 }
 EOF
 
     echo "$DOMAIN" > "$DOMAIN_FILE"
+    rm -rf /etc/systemd/system/xray.service.d
+    systemctl daemon-reload
     systemctl restart nginx && systemctl restart xray
-    echo -e "${GREEN}Instalasi Selesai!${NC}"
-    sleep 2
     main_menu
 }
 
+# --- Management Users Sub-Menu ---
+
+menu_users() {
+    clear
+    echo -e "${BLUE}┌──────────────────────────────────────────────────────────┐${NC}"
+    echo -e "│                   ${GREEN}MANAGEMENT USERS${NC}                     │"
+    echo -e "├──────────────────────────────────────────────────────────┤"
+    echo -e "│  ${CYAN}[1]${NC} Tambah User Baru                            │"
+    echo -e "│  ${CYAN}[2]${NC} Hapus User Aktif                            │"
+    echo -e "│  ${CYAN}[3]${NC} Lihat Daftar User & Share Link               │"
+    echo -e "│  ${CYAN}[4]${NC} Kembali ke Menu Utama                       │"
+    echo -e "└──────────────────────────────────────────────────────────┘"
+    echo -ne "  ${YELLOW}Pilih menu:${NC} "
+    read opt
+    case $opt in
+        1) add_user ;;
+        2) del_user ;;
+        3) list_user ;;
+        4) main_menu ;;
+        *) menu_users ;;
+    esac
+}
+
 add_user() {
-    echo -ne "  ${YELLOW}Nama User Baru:${NC} "
+    echo -ne "  Nama User Baru: "
     read USERNAME
-    if [[ -z "$USERNAME" ]]; then return; fi
+    [[ -z "$USERNAME" ]] && menu_users
     UUID=$(cat /proc/sys/kernel/random/uuid)
-    PASS="${USERNAME}$(shuf -i 100-999 -n 1)"
+    PASS=$(openssl rand -hex 6)
     for i in 0 2 4 6; do jq ".inbounds[$i].settings.clients += [{\"id\": \"$UUID\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
     for i in 1 3 5; do jq ".inbounds[$i].settings.clients += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
     systemctl restart xray
@@ -127,137 +154,87 @@ add_user() {
 }
 
 show_links() {
-    local USER=$1
-    local UUID=$2
-    local PASS=$3
-    local DOMAIN=$(cat $DOMAIN_FILE)
-
+    local USER=$1; local UUID=$2; local PASS=$3; local DOMAIN=$(cat $DOMAIN_FILE)
     clear
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "  ${GREEN}MIHOMO / CLASH META CONFIGURATION FOR:${NC} ${YELLOW}$USER${NC}"
-    echo -e "${CYAN}├──────────────────────────────────────────────────────────┤${NC}"
-    
+    echo -e "  ${GREEN}MIHOMO / CLASH META CONFIG FOR:${NC} ${YELLOW}$USER${NC}"
+    echo -e "├──────────────────────────────────────────────────────────┤"
     cat <<EOF
 proxies:
   - name: $USER-vless-ws
+    type: vless
     server: $DOMAIN
     port: 443
-    type: vless
-    udp: true
-    skip-cert-verify: true
     uuid: $UUID
-    cipher: auto
     tls: true
-    servername: $DOMAIN
     network: ws
     ws-opts:
       path: /vless-ws
-      headers:
-        Host: $DOMAIN
 
   - name: $USER-vless-grpc
+    type: vless
     server: $DOMAIN
     port: 443
-    type: vless
-    udp: true
-    skip-cert-verify: true
     uuid: $UUID
-    cipher: auto
     tls: true
-    servername: $DOMAIN
     network: grpc
     grpc-opts:
       grpc-service-name: vless-grpc
 
   - name: $USER-vless-upgrade
+    type: vless
     server: $DOMAIN
     port: 443
-    type: vless
-    udp: true
-    skip-cert-verify: true
     uuid: $UUID
-    cipher: auto
     tls: true
-    servername: $DOMAIN
     network: ws
     ws-opts:
       path: /vless-upgrade
-      headers:
-        Host: $DOMAIN
       v2ray-http-upgrade: true
 
   - name: $USER-vless-xhttp
+    type: vless
     server: $DOMAIN
     port: 443
-    type: vless
-    udp: true
-    skip-cert-verify: true
     uuid: $UUID
-    cipher: auto
     tls: true
-    servername: $DOMAIN
     network: xhttp
     xhttp-opts:
       path: /xhttp
       mode: stream
 
   - name: $USER-trojan-ws
+    type: trojan
     server: $DOMAIN
     port: 443
-    type: trojan
-    udp: true
-    skip-cert-verify: true
     password: $PASS
     tls: true
-    sni: $DOMAIN
     network: ws
     ws-opts:
       path: /trojan-ws
-      headers:
-        Host: $DOMAIN
-
-  - name: $USER-trojan-grpc
-    server: $DOMAIN
-    port: 443
-    type: trojan
-    udp: true
-    skip-cert-verify: true
-    password: $PASS
-    tls: true
-    sni: $DOMAIN
-    network: grpc
-    grpc-opts:
-      grpc-service-name: trojan-grpc
 
   - name: $USER-trojan-upgrade
+    type: trojan
     server: $DOMAIN
     port: 443
-    type: trojan
-    udp: true
-    skip-cert-verify: true
     password: $PASS
     tls: true
-    sni: $DOMAIN
     network: ws
     ws-opts:
       path: /trojan-upgrade
-      headers:
-        Host: $DOMAIN
       v2ray-http-upgrade: true
 EOF
-
-    echo -e "${CYAN}└──────────────────────────────────────────────────────────┘${NC}"
-    read -p "Tekan Enter untuk kembali ke menu..."
-    main_menu
+    echo -e "└──────────────────────────────────────────────────────────┘"
+    read -p "Tekan Enter..."
+    menu_users
 }
 
 list_user() {
     clear
     USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
-    if [[ -z "$USERS" ]]; then echo -e "${RED}Kosong.${NC}"; sleep 2; main_menu; return; fi
-    echo -e "${YELLOW}Pilih user:${NC}"
+    [[ -z "$USERS" ]] && menu_users
     select USERNAME in $USERS "Kembali"; do
-        if [ "$USERNAME" == "Kembali" ]; then main_menu; break; fi
+        [[ "$USERNAME" == "Kembali" ]] && menu_users
         UUID=$(jq -r ".inbounds[0].settings.clients[] | select(.email==\"$USERNAME\") | .id" $CONFIG_XRAY)
         PASS=$(jq -r ".inbounds[1].settings.clients[] | select(.email==\"$USERNAME\") | .password" $CONFIG_XRAY)
         show_links "$USERNAME" "$UUID" "$PASS"; break
@@ -267,72 +244,54 @@ list_user() {
 del_user() {
     clear
     USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
-    echo -e "${RED}Pilih user untuk dihapus:${NC}"
     select USERNAME in $USERS "Batal"; do
-        if [ "$USERNAME" == "Batal" ]; then main_menu; break; fi
+        [[ "$USERNAME" == "Batal" ]] && menu_users
         for i in {0..6}; do jq ".inbounds[$i].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
-        systemctl restart xray
-        echo -e "${GREEN}User $USERNAME dihapus.${NC}"
-        sleep 2; main_menu; break
+        systemctl restart xray; menu_users; break
     done
 }
 
-check_services() {
-    clear
-    echo -e "${BLUE}┌───────────────────────────┐${NC}"
-    echo -e "${BLUE}│${NC}      SERVICE STATUS       ${BLUE}│${NC}"
-    echo -e "${BLUE}├───────────────────────────┤${NC}"
-    echo -ne "${BLUE}│${NC} Xray  : "
-    if systemctl is-active --quiet xray; then echo -e "${GREEN}RUNNING${NC}     ${BLUE}│${NC}"; else echo -e "${RED}STOPPED${NC}     ${BLUE}│${NC}"; fi
-    echo -ne "${BLUE}│${NC} Nginx : "
-    if systemctl is-active --quiet nginx; then echo -e "${GREEN}RUNNING${NC}     ${BLUE}│${NC}"; else echo -e "${RED}STOPPED${NC}     ${BLUE}│${NC}"; fi
-    echo -e "${BLUE}└───────────────────────────┘${NC}"
-    read -p "Tekan Enter..."
-    main_menu
-}
+# --- Dashboard Utama ---
 
 main_menu() {
     clear
     DOMAIN=$(cat $DOMAIN_FILE 2>/dev/null || echo "Belum Setup")
-    OS=$(cat /etc/os-release | grep -w PRETTY_NAME | cut -d= -f2 | tr -d '"')
     RAM=$(free -m | awk '/Mem:/ { print $3 "MB / " $2 "MB" }')
     CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%
 
     echo -e "${BLUE}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "${BLUE}│${NC}                ${GREEN}XRAY ULTIMATE DASHBOARD${NC}                 ${BLUE}│${NC}"
-    echo -e "${BLUE}├──────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${BLUE}│${NC}  ${YELLOW}OS${NC}      : $OS"
-    echo -e "${BLUE}│${NC}  ${YELLOW}DOMAIN${NC}  : $DOMAIN"
-    echo -e "${BLUE}│${NC}  ${YELLOW}RAM${NC}     : $RAM"
-    echo -e "${BLUE}│${NC}  ${YELLOW}CPU${NC}     : $CPU Usage"
-    echo -e "${BLUE}├──────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${BLUE}│${NC}  ${CYAN}[1]${NC} Tambah User Baru (All Protocols)             ${BLUE}│${NC}"
-    echo -e "${BLUE}│${NC}  ${CYAN}[2]${NC} Hapus User Aktif                             ${BLUE}│${NC}"
-    echo -e "${BLUE}│${NC}  ${CYAN}[3]${NC} Lihat Daftar User & Share Link               ${BLUE}│${NC}"
-    echo -e "${BLUE}│${NC}  ${CYAN}[4]${NC} Cek Status Service Sistem                    ${BLUE}│${NC}"
-    echo -e "${BLUE}│${NC}  ${PURPLE}[R]${NC} Reinstall Script (Reset Total)               ${BLUE}│${NC}"
-    echo -e "${BLUE}│${NC}  ${CYAN}[5]${NC} Keluar (Exit)                                ${BLUE}│${NC}"
-    echo -e "${BLUE}└──────────────────────────────────────────────────────────┘${NC}"
+    echo -e "│                ${GREEN}XRAY ULTIMATE DASHBOARD${NC}                 │"
+    echo -e "├──────────────────────────────────────────────────────────┤"
+    echo -e "│  ${YELLOW}DOMAIN${NC}  : $DOMAIN"
+    echo -e "│  ${YELLOW}RAM${NC}     : $RAM"
+    echo -e "│  ${YELLOW}CPU${NC}     : $CPU Usage"
+    echo -e "├──────────────────────────────────────────────────────────┤"
+    echo -e "│  ${CYAN}[1]${NC} Management Users                            │"
+    echo -e "│  ${CYAN}[2]${NC} Check Services                              │"
+    echo -e "│  ${PURPLE}[R]${NC} Reinstall Script (Reset Total)               │"
+    echo -e "│  ${CYAN}[3]${NC} Quit (Exit)                                 │"
+    echo -e "└──────────────────────────────────────────────────────────┘"
     echo -ne "  ${YELLOW}Pilih menu:${NC} "
     read opt
     case $opt in
-        1) add_user ;;
-        2) del_user ;;
-        3) list_user ;;
-        4) check_services ;;
+        1) menu_users ;;
+        2) check_services ;;
         [rR]) reinstall_script ;;
-        5) exit ;;
+        3) exit ;;
         *) main_menu ;;
     esac
 }
 
+check_services() {
+    clear
+    echo -e "Xray  : $(systemctl is-active xray)"
+    echo -e "Nginx : $(systemctl is-active nginx)"
+    read -p "Enter..."
+    main_menu
+}
+
 check_install() {
-    if [[ -f "$CONFIG_XRAY" ]]; then
-        main_menu
-    else
-        echo -e "${YELLOW}Sistem belum terinstal. Memulai setup awal...${NC}"
-        install_all
-    fi
+    [[ -f "$CONFIG_XRAY" ]] && main_menu || install_all
 }
 
 check_install
