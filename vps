@@ -1,15 +1,12 @@
 #!/bin/bash
 
-# ==========================================
-# Path Konfigurasi
-# ==========================================
 CONFIG_XRAY="/usr/local/etc/xray/config.json"
 CONFIG_NGINX="/etc/nginx/sites-available/xray"
 NGINX_LINK="/etc/nginx/sites-enabled/xray"
 DOMAIN_FILE="/usr/local/etc/xray/domain.txt"
 SUB_DIR="/var/www/html/sub"
+COUNTRY_CODE=$(curl -s https://api.ip.sb/geoip -4 | jq -r '.country_code')
 
-# Hacker Style Colors
 GREEN='\033[0;32m'
 BRIGHT_GREEN='\033[1;32m'
 RED='\033[0;31m'
@@ -46,7 +43,7 @@ install_warp() {
 }
 
 # ==========================================
-# 2. System Installation & SSL Fix
+# 2. System Installation 
 # ==========================================
 install_all() {
     clear
@@ -88,7 +85,6 @@ server {
     location /trojan-grpc { if (\$request_method != "POST") { return 404; } client_max_body_size 0; grpc_pass grpc://127.0.0.1:10004; }
     location /vless-upgrade { proxy_pass http://127.0.0.1:10005; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
     location /trojan-upgrade { proxy_pass http://127.0.0.1:10006; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
-    location /xhttp { proxy_pass http://127.0.0.1:10007; proxy_http_version 1.1; proxy_set_header Host \$host; }
 }
 EOF
     systemctl restart nginx
@@ -109,7 +105,6 @@ EOF
     { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
     { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
     { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
-    { "port": 10007, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "xhttp", "xhttpSettings": { "path": "/xhttp" } } }
   ],
   "outbounds": [
     {
@@ -162,19 +157,15 @@ add_user() {
     
     # Generate Sub File (Raw Links)
     cat <<EOF > $SUB_DIR/$USERNAME
-vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-vless-ws
-vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-vless-grpc
-vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-vless-upgrade
-vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USERNAME-vless-xhttp
-trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USERNAME-trojan-ws
-trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USERNAME-trojan-grpc
+vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#vless-ws
+vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#vless-grpc
+vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#vless-upgrade
+trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#trojan-ws
+trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#trojan-grpc
 EOF
     systemctl restart xray
     show_links "$USERNAME" "$UUID" "$PASS"
 }
-
-COUNTRY_CODE=$(curl -s https://api.ip.sb/geoip -4 | jq -r '.country_code')
-
 
 show_links() {
     local USER=$1; local UUID=$2; local PASS=$3; local DOMAIN=$(cat $DOMAIN_FILE)
@@ -186,14 +177,6 @@ show_links() {
     echo -e "╠══════════════════════════════════════════════════════════╣"
     echo -e "  ${MAGENTA}REMOTE SUBSCRIPTION (RAW LINKS)${NC}"
     echo -e "  ${WHITE}$SUB_LINK${NC}"
-    echo -e "╠══════════════════════════════════════════════════════════╣"
-    echo -e "  ${CYAN}RAW PROTOCOL LINKS (MANUAL IMPORT)${NC}"
-    echo -e "  ${NC}────────────────────────────────────────────────────────"
-    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#VLESS-WS"
-    echo -e "  vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#VLESS-GRPC"
-    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#VLESS-XHTTP"
-    echo -e "  trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#TROJAN-WS"
-    echo -e "  trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#TROJAN-GRPC"
     echo -e "╠══════════════════════════════════════════════════════════╣"
     echo -e "  ${CYAN}MIHOMO / CLASH META YAML CONFIGURATION${NC}"
     echo -e "  ${NC}────────────────────────────────────────────────────────"
@@ -245,24 +228,6 @@ proxies:
       v2ray-http-upgrade: true
     udp: true
 
-  - name: vless-xhttp-${COUNTRY_CODE}
-    type: vless
-    server: support.zoom.us
-    port: 443
-    uuid: $UUID
-    cipher: auto
-    tls: true
-    udp: true
-    skip-cert-verify: true
-    servername: $DOMAIN
-    network: xhttp
-    xhttp-opts:
-      path: /xhttp
-      mode: stream
-      extra:
-        headers:
-          Host: $DOMAIN
-
   - name: trojan-ws-${COUNTRY_CODE}
     server: support.zoom.us
     port: 443
@@ -312,9 +277,6 @@ EOF
     menu_users
 }
 
-# ==========================================
-# 4. Vertical Dashboard
-# ==========================================
 main_menu() {
     clear
     show_header
@@ -406,7 +368,7 @@ reinstall_script() {
 }
 
 check_install() {
-    # Perbaikan: Skrip akan skip HANYA jika file konfigurasi ADA dan TIDAK KOSONG
+
     if [[ -f "$CONFIG_XRAY" && -s "$CONFIG_XRAY" ]]; then
         main_menu
     else
