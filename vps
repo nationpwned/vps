@@ -27,6 +27,9 @@ show_header() {
     echo -e "${NC}"
 }
 
+# ==========================================
+# 1. Cloudflare WARP Integration
+# ==========================================
 install_warp() {
     echo -e "${YELLOW}[!] Injecting Cloudflare WARP...${NC}"
     curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
@@ -39,6 +42,9 @@ install_warp() {
     warp-cli --accept-tos connect
 }
 
+# ==========================================
+# 2. System Installation 
+# ==========================================
 install_all() {
     clear
     show_header
@@ -51,6 +57,7 @@ install_all() {
     mkdir -p /usr/local/etc/xray/
     chown -R www-data:www-data /var/www/html
     
+    # HTTP Stage for SSL Verification
     cat <<EOF > $CONFIG_NGINX
 server { listen 80; server_name $DOMAIN; root /var/www/html; }
 EOF
@@ -59,6 +66,7 @@ EOF
     systemctl restart nginx
     certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
 
+    # Full Nginx SSL Config
     cat <<EOF > $CONFIG_NGINX
 server {
     listen 80; server_name $DOMAIN;
@@ -77,15 +85,16 @@ server {
     location /trojan-grpc { if (\$request_method != "POST") { return 404; } client_max_body_size 0; grpc_pass grpc://127.0.0.1:10004; }
     location /vless-upgrade { proxy_pass http://127.0.0.1:10005; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
     location /trojan-upgrade { proxy_pass http://127.0.0.1:10006; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
-    location /ss-ws { proxy_pass http://127.0.0.1:10007; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
 }
 EOF
     systemctl restart nginx
     install_warp
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
     
+    # Init Config Xray (Outbound WARP)
     ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
     ADMIN_PASS=$(openssl rand -hex 6)
+    # Init Config Xray (Full WARP Outbound)
     cat <<EOF > $CONFIG_XRAY
 {
   "log": { "loglevel": "warning" },
@@ -96,17 +105,33 @@ EOF
     { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
     { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
     { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
-    { "port": 10007, "listen": "127.0.0.1", "protocol": "shadowsocks", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin", "method": "aes-128-gcm"}], "network": "tcp,udp" }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/ss-ws" } } }
   ],
   "outbounds": [
-    { "protocol": "socks", "settings": { "servers": [{ "address": "127.0.0.1", "port": 40000 }] }, "tag": "warp" },
-    { "protocol": "freedom", "tag": "direct" }
+    {
+      "protocol": "socks",
+      "settings": {
+        "servers": [{ "address": "127.0.0.1", "port": 40000 }]
+      },
+      "tag": "warp"
+    },
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    }
   ],
   "routing": {
     "domainStrategy": "AsIs",
     "rules": [
-      { "type": "field", "outboundTag": "direct", "ip": ["geoip:private"] },
-      { "type": "field", "outboundTag": "warp", "network": "tcp,udp" }
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "ip": ["geoip:private"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "warp",
+        "network": "tcp,udp"
+      }
     ]
   }
 }
@@ -116,6 +141,9 @@ EOF
     main_menu
 }
 
+# ==========================================
+# 3. User & Links Management
+# ==========================================
 add_user() {
     echo -ne "  [!] Input Target Username: "
     read USERNAME
@@ -124,18 +152,16 @@ add_user() {
     PASS=$(openssl rand -hex 6)
     DOMAIN=$(cat $DOMAIN_FILE)
 
-    for i in 0 2 4; do jq ".inbounds[$i].settings.clients += [{\"id\": \"$UUID\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
+    for i in 0 2 4 6; do jq ".inbounds[$i].settings.clients += [{\"id\": \"$UUID\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
     for i in 1 3 5; do jq ".inbounds[$i].settings.clients += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
-    jq ".inbounds[6].settings.clients += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\", \"method\": \"aes-128-gcm\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY
     
-    SS_BASE=$(echo -n "aes-128-gcm:$PASS" | base64 -w 0)
+    # Generate Sub File (Raw Links)
     cat <<EOF > $SUB_DIR/$USERNAME
 vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#vless-ws
 vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#vless-grpc
 vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#vless-upgrade
 trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#trojan-ws
 trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#trojan-grpc
-ss://$SS_BASE@$DOMAIN:443?plugin=v2ray-plugin%3Bpath%3D%2Fss-ws%3Bhost%3D$DOMAIN%3Btls#ss-ws
 EOF
     systemctl restart xray
     show_links "$USERNAME" "$UUID" "$PASS"
@@ -245,37 +271,10 @@ proxies:
     grpc-opts:
       grpc-service-name: trojan-grpc
     udp: true
-
-  - name: ss-ws-${COUNTRY_CODE}
-    type: ss
-    server: support.zoom.us
-    port: 443
-    cipher: aes-128-gcm
-    password: $PASS
-    plugin: v2ray-plugin
-    plugin-opts:
-      mode: websocket
-      host: $DOMAIN
-      path: /ss-ws
-      tls: true
-      skip-cert-verify: true
 EOF
-    echo -e "  ${YELLOW}(... and more protocols in raw link)${NC}"
     echo -e "╚══════════════════════════════════════════════════════════╝"
     read -p "  Press Enter..."
     menu_users
-}
-
-del_user() {
-    clear
-    show_header
-    USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
-    select USERNAME in $USERS "CANCEL"; do
-        [[ "$USERNAME" == "CANCEL" ]] && menu_users
-        for i in {0..6}; do jq ".inbounds[$i].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
-        rm -f $SUB_DIR/$USERNAME
-        systemctl restart xray; menu_users; break
-    done
 }
 
 main_menu() {
@@ -289,9 +288,11 @@ main_menu() {
     [[ "$WARP_RAW" == *"Connected"* ]] && WARP_STATUS="${GREEN}Connected${NC}" || WARP_STATUS="${RED}Disconnected${NC}"
 
     echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "║  ${BRIGHT_GREEN}SYSTEM STATUS | XRAY-ULTIMATE${NC}               ║"
+    echo -e "║  ${BRIGHT_GREEN}SYSTEM STATUS | POWERED BY GEMINI${NC}          ║"
     echo -e "╠══════════════════════════════════════════════════════════╣"
     echo -e "║  [${GREEN}●${NC}] NODE     : ${WHITE}$DOMAIN${NC}"
+    echo -e "║  [${GREEN}●${NC}] MEMORY   : ${WHITE}$RAM${NC}"
+    echo -e "║  [${GREEN}●${NC}] LOAD     : ${WHITE}$CPU Usage${NC}"
     echo -e "║  [${GREEN}●${NC}] WARP     : $WARP_STATUS"
     echo -e "║  [${GREEN}●${NC}] UPTIME   : ${WHITE}$UPTIME${NC}"
     echo -e "╠══════════════════════════════════════════════════════════╣"
@@ -307,15 +308,6 @@ main_menu() {
         0|00) exit ;;
         *) main_menu ;;
     esac
-}
-
-check_services() {
-    clear
-    show_header
-    echo -e "Xray  : $(systemctl is-active xray)"
-    echo -e "Nginx : $(systemctl is-active nginx)"
-    read -p "  Press Enter..."
-    main_menu
 }
 
 menu_users() {
@@ -347,6 +339,27 @@ list_user() {
     done
 }
 
+del_user() {
+    clear
+    show_header
+    USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
+    select USERNAME in $USERS "CANCEL"; do
+        [[ "$USERNAME" == "CANCEL" ]] && menu_users
+        for i in {0..6}; do jq ".inbounds[$i].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
+        rm -f $SUB_DIR/$USERNAME
+        systemctl restart xray; menu_users; break
+    done
+}
+
+check_services() {
+    clear
+    show_header
+    echo -e "Xray  : $(systemctl is-active xray)"
+    echo -e "Nginx : $(systemctl is-active nginx)"
+    read -p "  Press Enter..."
+    main_menu
+}
+
 reinstall_script() {
     systemctl stop xray nginx 2>/dev/null
     rm -rf /usr/local/etc/xray/
@@ -355,6 +368,7 @@ reinstall_script() {
 }
 
 check_install() {
+
     if [[ -f "$CONFIG_XRAY" && -s "$CONFIG_XRAY" ]]; then
         main_menu
     else
