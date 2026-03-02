@@ -1,6 +1,6 @@
 ```
-curl -fsSL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/sshvpn/install.sh -o sshvpn
-chmod +x sshvpn
+curl -fsSL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/script/install.sh -o install
+chmod +x install
 
-sudo su -c "./sshvpn"
+sudo su -c "./install"
 ```
