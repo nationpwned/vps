@@ -162,14 +162,20 @@ show_links() {
     cat <<EOF
 proxies:
   - name: $USER-vless-ws
-    type: vless
     server: $DOMAIN
     port: 443
+    type: vless
     uuid: $UUID
+    cipher: auto
     tls: true
+    skip-cert-verify: true
+    servername: $DOMAIN
     network: ws
     ws-opts:
       path: /vless-ws
+      headers:
+        Host: $DOMAIN
+    udp: true
 
   - name: $USER-vless-grpc
     type: vless
@@ -177,52 +183,88 @@ proxies:
     port: 443
     uuid: $UUID
     tls: true
+    skip-cert-verify: true
+    servername: $DOMAIN
     network: grpc
     grpc-opts:
       grpc-service-name: vless-grpc
+    udp: true
 
   - name: $USER-vless-upgrade
-    type: vless
     server: $DOMAIN
     port: 443
+    type: vless
+    skip-cert-verify: true
     uuid: $UUID
+    cipher: auto
     tls: true
+    servername: $DOMAIN
     network: ws
     ws-opts:
       path: /vless-upgrade
+      headers:
+        Host: $DOMAIN
       v2ray-http-upgrade: true
+    udp: true
 
   - name: $USER-vless-xhttp
     type: vless
     server: $DOMAIN
     port: 443
     uuid: $UUID
+    skip-cert-verify: true
+    cipher: auto
     tls: true
+    servername: $DOMAIN
     network: xhttp
     xhttp-opts:
       path: /xhttp
       mode: stream
+    udp: true
 
   - name: $USER-trojan-ws
-    type: trojan
     server: $DOMAIN
     port: 443
+    type: trojan
     password: $PASS
+    skip-cert-verify: true
+    sni: $DOMAIN
     tls: true
     network: ws
     ws-opts:
       path: /trojan-ws
+      headers:
+        Host: $DOMAIN
+    udp: true
 
   - name: $USER-trojan-upgrade
-    type: trojan
     server: $DOMAIN
     port: 443
+    type: trojan
     password: $PASS
+    skip-cert-verify: true
+    sni: $DOMAIN
     tls: true
     network: ws
     ws-opts:
       path: /trojan-upgrade
+      headers:
+        Host: $DOMAIN
       v2ray-http-upgrade: true
+    udp: true
+
+  - name: $USER-trojan-grpc
+    type: trojan
+    server: $DOMAIN
+    port: 443
+    password: $PASS
+    skip-cert-verify: true
+    sni: $DOMAIN
+    tls: true
+    network: grpc
+    grpc-opts:
+      grpc-service-name: trojan-grpc
+    udp: true
 EOF
     echo -e "└──────────────────────────────────────────────────────────┘"
     read -p "Tekan Enter..."
