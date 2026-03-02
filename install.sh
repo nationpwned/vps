@@ -127,23 +127,127 @@ add_user() {
 }
 
 show_links() {
-    local USER=$1; local UUID=$2; local PASS=$3; local DOMAIN=$(cat $DOMAIN_FILE)
+    local USER=$1
+    local UUID=$2
+    local PASS=$3
+    local DOMAIN=$(cat $DOMAIN_FILE)
+
     clear
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "  ${GREEN}CONFIG LINKS FOR USER:${NC} ${YELLOW}$USER${NC}"
+    echo -e "  ${GREEN}MIHOMO / CLASH META CONFIGURATION FOR:${NC} ${YELLOW}$USER${NC}"
     echo -e "${CYAN}├──────────────────────────────────────────────────────────┤${NC}"
-    echo -e "${BLUE}[ VLESS ]${NC}"
-    echo -e " WS      : vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USER-VLESS-ws"
-    echo -e " gRPC    : vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USER-VLESS-grpc"
-    echo -e " Upgrade : vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USER-VLESS-upgrade"
-    echo -e " XHTTP   : vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=packet-streamed#$USER-VLESS-xhttp"
-    echo -e ""
-    echo -e "${BLUE}[ TROJAN ]${NC}"
-    echo -e " WS      : trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USER-TROJAN-ws"
-    echo -e " gRPC    : trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USER-TROJAN-grpc"
-    echo -e " Upgrade : trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-upgrade&security=tls&type=httpupgrade#$USER-TROJAN-upgrade"
+    
+    cat <<EOF
+proxies:
+  - name: $USER-vless-ws
+    server: $DOMAIN
+    port: 443
+    type: vless
+    udp: true
+    skip-cert-verify: true
+    uuid: $UUID
+    cipher: auto
+    tls: true
+    servername: $DOMAIN
+    network: ws
+    ws-opts:
+      path: /vless-ws
+      headers:
+        Host: $DOMAIN
+
+  - name: $USER-vless-grpc
+    server: $DOMAIN
+    port: 443
+    type: vless
+    udp: true
+    skip-cert-verify: true
+    uuid: $UUID
+    cipher: auto
+    tls: true
+    servername: $DOMAIN
+    network: grpc
+    grpc-opts:
+      grpc-service-name: vless-grpc
+
+  - name: $USER-vless-upgrade
+    server: $DOMAIN
+    port: 443
+    type: vless
+    udp: true
+    skip-cert-verify: true
+    uuid: $UUID
+    cipher: auto
+    tls: true
+    servername: $DOMAIN
+    network: ws
+    ws-opts:
+      path: /vless-upgrade
+      headers:
+        Host: $DOMAIN
+      v2ray-http-upgrade: true
+
+  - name: $USER-vless-xhttp
+    server: $DOMAIN
+    port: 443
+    type: vless
+    udp: true
+    skip-cert-verify: true
+    uuid: $UUID
+    cipher: auto
+    tls: true
+    servername: $DOMAIN
+    network: xhttp
+    xhttp-opts:
+      path: /xhttp
+      mode: stream
+
+  - name: $USER-trojan-ws
+    server: $DOMAIN
+    port: 443
+    type: trojan
+    udp: true
+    skip-cert-verify: true
+    password: $PASS
+    tls: true
+    sni: $DOMAIN
+    network: ws
+    ws-opts:
+      path: /trojan-ws
+      headers:
+        Host: $DOMAIN
+
+  - name: $USER-trojan-grpc
+    server: $DOMAIN
+    port: 443
+    type: trojan
+    udp: true
+    skip-cert-verify: true
+    password: $PASS
+    tls: true
+    sni: $DOMAIN
+    network: grpc
+    grpc-opts:
+      grpc-service-name: trojan-grpc
+
+  - name: $USER-trojan-upgrade
+    server: $DOMAIN
+    port: 443
+    type: trojan
+    udp: true
+    skip-cert-verify: true
+    password: $PASS
+    tls: true
+    sni: $DOMAIN
+    network: ws
+    ws-opts:
+      path: /trojan-upgrade
+      headers:
+        Host: $DOMAIN
+      v2ray-http-upgrade: true
+EOF
+
     echo -e "${CYAN}└──────────────────────────────────────────────────────────┘${NC}"
-    read -p "Tekan Enter..."
+    read -p "Tekan Enter untuk kembali ke menu..."
     main_menu
 }
 
