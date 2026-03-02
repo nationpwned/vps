@@ -31,17 +31,23 @@ show_header() {
 }
 
 # ==========================================
-# System Installation & Management
+# 1. Cloudflare WARP Integration
 # ==========================================
-setup_env() {
-    echo -e "${YELLOW}[!] Initializing Environment...${NC}"
-    apt update && apt install -y ufw nginx jq curl socat certbot python3-certbot-nginx openssl
-    mkdir -p $SUB_DIR
-    chown -R www-data:www-data /var/www/html
-    ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp
-    echo "y" | ufw enable
+install_warp() {
+    echo -e "${YELLOW}[!] Injecting Cloudflare WARP...${NC}"
+    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
+    apt update && apt install cloudflare-warp -y
+    warp-cli --accept-tos registration delete 2>/dev/null
+    warp-cli --accept-tos registration new
+    warp-cli --accept-tos mode proxy
+    warp-cli --accept-tos proxy port 40000
+    warp-cli --accept-tos connect
 }
 
+# ==========================================
+# 2. System Installation & SSL Fix
+# ==========================================
 install_all() {
     clear
     show_header
@@ -49,35 +55,33 @@ install_all() {
     read -p "  Enter Email  : " EMAIL
     [[ -z "$DOMAIN" || -z "$EMAIL" ]] && exit 1
     
-    setup_env
-    systemctl stop apache2 2>/dev/null && apt remove -y apache2 2>/dev/null
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+    apt update && apt install -y ufw nginx jq curl socat certbot python3-certbot-nginx openssl lsb-release
+    mkdir -p $SUB_DIR
+    mkdir -p /usr/local/etc/xray/
+    chown -R www-data:www-data /var/www/html
+    
+    # HTTP Stage for SSL Verification
+    cat <<EOF > $CONFIG_NGINX
+server { listen 80; server_name $DOMAIN; root /var/www/html; }
+EOF
+    ln -sf $CONFIG_NGINX $NGINX_LINK
+    rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+    systemctl restart nginx
+    certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
 
-    ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
-    ADMIN_PASS=$(openssl rand -hex 6)
-
-# Nginx SSL & Proxy Setup (Fixed Version)
+    # Full Nginx SSL Config
     cat <<EOF > $CONFIG_NGINX
 server {
-    listen 80;
-    server_name $DOMAIN;
-    root /var/www/html;
+    listen 80; server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
 }
-
 server {
     listen 443 ssl http2;
     server_name $DOMAIN;
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-    # Handle subscription requests
-    location /sub {
-        root /var/www/html;
-        index index.html;
-        default_type text/plain;
-        try_files \$uri \$uri/ =404;
-    }
-
+    location /sub { alias $SUB_DIR/; default_type text/plain; }
     location /vless-ws { proxy_pass http://127.0.0.1:10001; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
     location /trojan-ws { proxy_pass http://127.0.0.1:10002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
     location /vless-grpc { if (\$request_method != "POST") { return 404; } client_max_body_size 0; grpc_pass grpc://127.0.0.1:10003; }
@@ -87,11 +91,14 @@ server {
     location /xhttp { proxy_pass http://127.0.0.1:10007; proxy_http_version 1.1; proxy_set_header Host \$host; }
 }
 EOF
-    ln -sf $CONFIG_NGINX $NGINX_LINK
     systemctl restart nginx
-    certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
-
-    # Xray JSON
+    install_warp
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+    
+    # Init Config Xray (Outbound WARP)
+    ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
+    ADMIN_PASS=$(openssl rand -hex 6)
+    # Init Config Xray (Full WARP Outbound)
     cat <<EOF > $CONFIG_XRAY
 {
   "log": { "loglevel": "warning" },
@@ -104,16 +111,43 @@ EOF
     { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
     { "port": 10007, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "xhttp", "xhttpSettings": { "path": "/xhttp" } } }
   ],
-  "outbounds": [{ "protocol": "freedom" }]
+  "outbounds": [
+    {
+      "protocol": "socks",
+      "settings": {
+        "servers": [{ "address": "127.0.0.1", "port": 40000 }]
+      },
+      "tag": "warp"
+    },
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "ip": ["geoip:private"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "warp",
+        "network": "tcp,udp"
+      }
+    ]
+  }
 }
 EOF
     echo "$DOMAIN" > "$DOMAIN_FILE"
-    systemctl restart nginx && systemctl restart xray
+    systemctl restart xray
     main_menu
 }
 
 # ==========================================
-# User Management Functions
+# 3. User & Links Management
 # ==========================================
 add_user() {
     echo -ne "  [!] Input Target Username: "
@@ -126,17 +160,15 @@ add_user() {
     for i in 0 2 4 6; do jq ".inbounds[$i].settings.clients += [{\"id\": \"$UUID\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
     for i in 1 3 5; do jq ".inbounds[$i].settings.clients += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
     
-    # Sub file with raw links
+    # Generate Sub File (Raw Links)
     cat <<EOF > $SUB_DIR/$USERNAME
-vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-vless-es
-vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-vless-grpc
-vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-vless-upgrade
+vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-vws
+vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-vgrpc
+vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-vupgrade
 vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USERNAME-xhttp
 trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USERNAME-trojan-ws
 trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USERNAME-trojan-grpc
-trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-upgrade&security=tls&type=httpupgrade#$USERNAME-trojan-upgrade
 EOF
-
     systemctl restart xray
     show_links "$USERNAME" "$UUID" "$PASS"
 }
@@ -152,19 +184,26 @@ show_links() {
     echo -e "  ${MAGENTA}REMOTE SUBSCRIPTION (RAW LINKS)${NC}"
     echo -e "  ${WHITE}$SUB_LINK${NC}"
     echo -e "╠══════════════════════════════════════════════════════════╣"
+    echo -e "  ${CYAN}RAW PROTOCOL LINKS (MANUAL IMPORT)${NC}"
+    echo -e "  ${NC}────────────────────────────────────────────────────────"
+    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USER-VWS"
+    echo -e "  vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USER-VGRPC"
+    echo -e "  vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USER-XHTTP"
+    echo -e "  trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USER-TWS"
+    echo -e "╠══════════════════════════════════════════════════════════╣"
     echo -e "  ${CYAN}MIHOMO / CLASH META YAML CONFIGURATION${NC}"
     echo -e "  ${NC}────────────────────────────────────────────────────────"
     cat <<EOF
 proxies:
-  - name: $USER-vless-ws
-    server: $DOMAIN
+  - name: $USER-vless-ws-SG
+    server: support.zoom.us
     port: 443
     type: vless
     uuid: $UUID
     cipher: auto
     tls: true
     skip-cert-verify: true
-    servername: $DOMAIN
+    servername: zoomgov.sibondt.my.id
     network: ws
     ws-opts:
       path: /vless-ws
@@ -172,28 +211,28 @@ proxies:
         Host: $DOMAIN
     udp: true
 
-  - name: $USER-vless-grpc
+  - name: $USER-vless-grpc-SG
     type: vless
-    server: $DOMAIN
+    server: support.zoom.us
     port: 443
     uuid: $UUID
     tls: true
     skip-cert-verify: true
-    servername: $DOMAIN
+    servername: support.zoom.us.$DOMAIN
     network: grpc
     grpc-opts:
       grpc-service-name: vless-grpc
     udp: true
 
-  - name: $USER-vless-upgrade
-    server: $DOMAIN
+  - name: $USER-vless-upgrade-SG
+    server: support.zoom.us
     port: 443
     type: vless
     skip-cert-verify: true
     uuid: $UUID
     cipher: auto
     tls: true
-    servername: $DOMAIN
+    servername: zoomgov.sibondt.my.id
     network: ws
     ws-opts:
       path: /vless-upgrade
@@ -202,16 +241,16 @@ proxies:
       v2ray-http-upgrade: true
     udp: true
 
-  - name: $USER-vless-xhttp
+  - name: $USER-vless-xhttp-SG
     type: vless
-    server: $DOMAIN
+    server: support.zoom.us
     port: 443
     uuid: $UUID
     cipher: auto
     tls: true
     udp: true
     skip-cert-verify: true
-    servername: $DOMAIN
+    servername: zoomgov.sibondt.my.id
     network: xhttp
     xhttp-opts:
       path: /xhttp
@@ -220,13 +259,13 @@ proxies:
         headers:
           Host: $DOMAIN
 
-  - name: $USER-trojan-ws
-    server: $DOMAIN
+  - name: $USER-trojan-ws-SG
+    server: support.zoom.us
     port: 443
     type: trojan
     password: $PASS
     skip-cert-verify: true
-    sni: $DOMAIN
+    sni: zoomgov.sibondt.my.id
     tls: true
     network: ws
     ws-opts:
@@ -235,13 +274,13 @@ proxies:
         Host: $DOMAIN
     udp: true
 
-  - name: $USER-trojan-upgrade
-    server: $DOMAIN
+  - name: $USER-trojan-upgrade-SG
+    server: support.zoom.us
     port: 443
     type: trojan
     password: $PASS
     skip-cert-verify: true
-    sni: $DOMAIN
+    sni: zoomgov.sibondt.my.id
     tls: true
     network: ws
     ws-opts:
@@ -251,13 +290,13 @@ proxies:
       v2ray-http-upgrade: true
     udp: true
 
-  - name: $USER-trojan-grpc
+  - name: $USER-trojan-grpc-SG
     type: trojan
-    server: $DOMAIN
+    server: support.zoom.us
     port: 443
     password: $PASS
     skip-cert-verify: true
-    sni: $DOMAIN
+    sni: support.zoom.us.$DOMAIN
     tls: true
     network: grpc
     grpc-opts:
@@ -270,30 +309,8 @@ EOF
 }
 
 # ==========================================
-# VERTICAL MENUS
+# 4. Vertical Dashboard
 # ==========================================
-menu_users() {
-    clear
-    show_header
-    echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "║                ${MAGENTA}DATABASE USER MANAGEMENT${NC}               ║"
-    echo -e "╠══════════════════════════════════════════════════════════╣"
-    echo -e "║  ${CYAN}[01]${NC} INJECT NEW TARGET (ADD USER)                     ║"
-    echo -e "║  ${CYAN}[02]${NC} PURGE TARGET (DELETE USER)                       ║"
-    echo -e "║  ${CYAN}[03]${NC} EXTRACT CLIENT LINKS (LIST USERS)                ║"
-    echo -e "║  ${CYAN}[04]${NC} RETURN TO CORE MENU                              ║"
-    echo -e "╚══════════════════════════════════════════════════════════╝"
-    echo -ne "  ${BRIGHT_GREEN}admin@database:${NC}${CYAN}#${NC} "
-    read opt
-    case $opt in
-        1|01) add_user ;;
-        2|02) del_user ;;
-        3|03) list_user ;;
-        4|04) main_menu ;;
-        *) menu_users ;;
-    esac
-}
-
 main_menu() {
     clear
     show_header
@@ -301,20 +318,20 @@ main_menu() {
     RAM=$(free -m | awk '/Mem:/ { print $3 "/" $2 "MB" }')
     CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%
     UPTIME=$(uptime -p)
+    WARP_RAW=$(warp-cli status 2>/dev/null)
+    [[ "$WARP_RAW" == *"Connected"* ]] && WARP_STATUS="${GREEN}Connected${NC}" || WARP_STATUS="${RED}Disconnected${NC}"
 
     echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "║  ${BRIGHT_GREEN}SYSTEM OPERATIONAL STATUS${NC}                            ║"
+    echo -e "║  ${BRIGHT_GREEN}SYSTEM STATUS | POWERED BY GEMINI${NC}          ║"
     echo -e "╠══════════════════════════════════════════════════════════╣"
     echo -e "║  [${GREEN}●${NC}] NODE     : ${WHITE}$DOMAIN${NC}"
     echo -e "║  [${GREEN}●${NC}] MEMORY   : ${WHITE}$RAM${NC}"
     echo -e "║  [${GREEN}●${NC}] LOAD     : ${WHITE}$CPU Usage${NC}"
+    echo -e "║  [${GREEN}●${NC}] WARP     : $WARP_STATUS"
     echo -e "║  [${GREEN}●${NC}] UPTIME   : ${WHITE}$UPTIME${NC}"
     echo -e "╠══════════════════════════════════════════════════════════╣"
-    echo -e "║  ${MAGENTA}AVAILABLE COMMANDS:${NC}                                    ║"
-    echo -e "║  ${CYAN}[01]${NC} ACCESS USER MANAGEMENT                           ║"
-    echo -e "║  ${CYAN}[02]${NC} RUN SERVICE DIAGNOSTICS                          ║"
-    echo -e "║  ${RED}[RR]${NC} SYSTEM REINSTALL (PURGE ALL DATA)                ║"
-    echo -e "║  ${CYAN}[00]${NC} TERMINATE SESSION                                ║"
+    echo -e "║  ${CYAN}[01]${NC} MANAGEMENT USERS | ${CYAN}[02]${NC} DIAGNOSTICS | ${RED}[RR]${NC} RESET  ║"
+    echo -e "║  ${CYAN}[00]${NC} TERMINATE SESSION                                 ║"
     echo -e "╚══════════════════════════════════════════════════════════╝"
     echo -ne "  ${BRIGHT_GREEN}root@xray-vps:${NC}${CYAN}#${NC} "
     read opt
@@ -327,9 +344,21 @@ main_menu() {
     esac
 }
 
-# ==========================================
-# Helpers
-# ==========================================
+menu_users() {
+    clear
+    show_header
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "║  ${CYAN}[01]${NC} ADD TARGET  |  ${CYAN}[02]${NC} DEL TARGET  |  ${CYAN}[03]${NC} LIST      ║"
+    echo -e "╚══════════════════════════════════════════════════════════╝"
+    read -p "  Selection: " opt
+    case $opt in
+        1|01) add_user ;;
+        2|02) del_user ;;
+        3|03) list_user ;;
+        *) main_menu ;;
+    esac
+}
+
 list_user() {
     clear
     show_header
@@ -365,8 +394,20 @@ check_services() {
     main_menu
 }
 
+reinstall_script() {
+    systemctl stop xray nginx 2>/dev/null
+    rm -rf /usr/local/etc/xray/
+    rm -rf $SUB_DIR/*
+    install_all
+}
+
 check_install() {
-    [[ -f "$CONFIG_XRAY" ]] && main_menu || install_all
+    # Perbaikan: Skrip akan skip HANYA jika file konfigurasi ADA dan TIDAK KOSONG
+    if [[ -f "$CONFIG_XRAY" && -s "$CONFIG_XRAY" ]]; then
+        main_menu
+    else
+        install_all
+    fi
 }
 
 check_install
