@@ -207,20 +207,23 @@ proxies:
       v2ray-http-upgrade: true
     udp: true
 
-  - name: $USER-vless-xhttp
+- name: $USER-vless-xhttp
     type: vless
     server: $DOMAIN
     port: 443
     uuid: $UUID
-    skip-cert-verify: true
     cipher: auto
     tls: true
+    udp: true
+    skip-cert-verify: true
     servername: $DOMAIN
     network: xhttp
     xhttp-opts:
       path: /xhttp
       mode: stream
-    udp: true
+      extra:
+        headers:
+          Host: $DOMAIN
 
   - name: $USER-trojan-ws
     server: $DOMAIN
