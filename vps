@@ -1,88 +1,82 @@
 #!/bin/bash
 
+# ==========================================
 # Path Konfigurasi
+# ==========================================
 CONFIG_XRAY="/usr/local/etc/xray/config.json"
 CONFIG_NGINX="/etc/nginx/sites-available/xray"
 NGINX_LINK="/etc/nginx/sites-enabled/xray"
 DOMAIN_FILE="/usr/local/etc/xray/domain.txt"
+SUB_DIR="/var/www/html/sub"
 
-# Definisi Warna (UI)
-RED='\033[0;31m'
+# Hacker Style Colors
 GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
+BRIGHT_GREEN='\033[1;32m'
+RED='\033[0;31m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+YELLOW='\033[1;33m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-# 1. Setup Firewall & Dependencies
+show_header() {
+    echo -e "${BRIGHT_GREEN}"
+    echo "  ██╗  ██╗██████╗  █████╗ ██╗   ██╗    ██████╗ ██████╗  ██████╗ "
+    echo "  ╚██╗██╔╝██╔══██╗██╔══██╗╚██╗ ██╔╝    ██╔══██╗██╔══██╗██╔═══██╗"
+    echo "   ╚███╔╝ ██████╔╝███████║ ╚████╔╝     ██████╔╝██████╔╝██║   ██║"
+    echo "   ██╔██╗ ██╔══██╗██╔══██║  ╚██╔╝      ██╔═══╝ ██╔══██╗██║   ██║"
+    echo "  ██╔╝ ██╗██║  ██║██║  ██║   ██║       ██║     ██║  ██║╚██████╔╝"
+    echo "  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝     ╚═╝  ╚═╝ ╚═════╝ "
+    echo -e "${NC}"
+}
+
+# ==========================================
+# System Installation & Management
+# ==========================================
 setup_env() {
-    echo -e "${YELLOW}Mengonfigurasi Firewall & Dependencies...${NC}"
+    echo -e "${YELLOW}[!] Initializing Environment...${NC}"
     apt update && apt install -y ufw nginx jq curl socat certbot python3-certbot-nginx openssl
+    mkdir -p $SUB_DIR
+    chown -R www-data:www-data /var/www/html
     ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp
     echo "y" | ufw enable
 }
 
-# 2. Fungsi Reinstall (Pembersihan Total)
-reinstall_script() {
-    clear
-    echo -e "${RED}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "│                ${WHITE}WARNING: REINSTALL SYSTEM${NC}                 │"
-    echo -e "├──────────────────────────────────────────────────────────┤"
-    echo -e "│ Semua data user, SSL, dan konfigurasi akan DIHAPUS!     │"
-    echo -e "└──────────────────────────────────────────────────────────┘"
-    read -p "  Apakah Anda yakin? (y/n): " confirm
-    if [[ $confirm == [yY] ]]; then
-        systemctl stop xray nginx 2>/dev/null
-        rm -rf /usr/local/etc/xray/
-        rm -f $CONFIG_NGINX $NGINX_LINK
-        rm -rf /etc/systemd/system/xray.service.d
-        echo -e "${GREEN}Pembersihan selesai. Mengulang instalasi...${NC}"
-        sleep 2
-        install_all
-    else
-        main_menu
-    fi
-}
-
-# 3. Proses Instalasi Utama
 install_all() {
     clear
-    echo -e "${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "│                ${WHITE}INITIAL INSTALLATION${NC}                  │"
-    echo -e "└──────────────────────────────────────────────────────────┘"
-    
-    read -p "  Masukkan Domain Anda : " DOMAIN
-    read -p "  Masukkan Email SSL   : " EMAIL
-    if [[ -z "$DOMAIN" || -z "$EMAIL" ]]; then echo -e "${RED}Error: Data tidak lengkap!${NC}"; exit 1; fi
+    show_header
+    read -p "  Enter Domain : " DOMAIN
+    read -p "  Enter Email  : " EMAIL
+    [[ -z "$DOMAIN" || -z "$EMAIL" ]] && exit 1
     
     setup_env
     systemctl stop apache2 2>/dev/null && apt remove -y apache2 2>/dev/null
-
-    echo -e "${YELLOW}Installing Xray-core...${NC}"
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 
-    # Generate Admin Awal
-    mkdir -p /usr/local/etc/xray/
     ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
     ADMIN_PASS=$(openssl rand -hex 6)
 
-    # Nginx SSL & Proxy Setup
+# Nginx SSL & Proxy Setup (Fixed Version)
     cat <<EOF > $CONFIG_NGINX
-server { listen 80; server_name $DOMAIN; root /var/www/html; }
-EOF
-    ln -sf $CONFIG_NGINX $NGINX_LINK
-    rm -f /etc/nginx/sites-enabled/default 2>/dev/null
-    systemctl restart nginx
-    certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
+server {
+    listen 80;
+    server_name $DOMAIN;
+    root /var/www/html;
+}
 
-    cat <<EOF > $CONFIG_NGINX
 server {
     listen 443 ssl http2;
     server_name $DOMAIN;
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+
+    # Handle subscription requests
+    location /sub {
+        root /var/www/html;
+        index index.html;
+        default_type text/plain;
+        try_files \$uri \$uri/ =404;
+    }
 
     location /vless-ws { proxy_pass http://127.0.0.1:10001; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
     location /trojan-ws { proxy_pass http://127.0.0.1:10002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
@@ -93,8 +87,11 @@ server {
     location /xhttp { proxy_pass http://127.0.0.1:10007; proxy_http_version 1.1; proxy_set_header Host \$host; }
 }
 EOF
+    ln -sf $CONFIG_NGINX $NGINX_LINK
+    systemctl restart nginx
+    certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
 
-    # Xray JSON Config
+    # Xray JSON
     cat <<EOF > $CONFIG_XRAY
 {
   "log": { "loglevel": "warning" },
@@ -110,55 +107,53 @@ EOF
   "outbounds": [{ "protocol": "freedom" }]
 }
 EOF
-
     echo "$DOMAIN" > "$DOMAIN_FILE"
-    rm -rf /etc/systemd/system/xray.service.d
-    systemctl daemon-reload
     systemctl restart nginx && systemctl restart xray
     main_menu
 }
 
-# --- Management Users Sub-Menu ---
-
-menu_users() {
-    clear
-    echo -e "${BLUE}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "│                   ${GREEN}MANAGEMENT USERS${NC}                     │"
-    echo -e "├──────────────────────────────────────────────────────────┤"
-    echo -e "│  ${CYAN}[1]${NC} Tambah User Baru                            │"
-    echo -e "│  ${CYAN}[2]${NC} Hapus User Aktif                            │"
-    echo -e "│  ${CYAN}[3]${NC} Lihat Daftar User & Share Link               │"
-    echo -e "│  ${CYAN}[4]${NC} Kembali ke Menu Utama                       │"
-    echo -e "└──────────────────────────────────────────────────────────┘"
-    echo -ne "  ${YELLOW}Pilih menu:${NC} "
-    read opt
-    case $opt in
-        1) add_user ;;
-        2) del_user ;;
-        3) list_user ;;
-        4) main_menu ;;
-        *) menu_users ;;
-    esac
-}
-
+# ==========================================
+# User Management Functions
+# ==========================================
 add_user() {
-    echo -ne "  Nama User Baru: "
+    echo -ne "  [!] Input Target Username: "
     read USERNAME
     [[ -z "$USERNAME" ]] && menu_users
     UUID=$(cat /proc/sys/kernel/random/uuid)
     PASS=$(openssl rand -hex 6)
+    DOMAIN=$(cat $DOMAIN_FILE)
+
     for i in 0 2 4 6; do jq ".inbounds[$i].settings.clients += [{\"id\": \"$UUID\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
     for i in 1 3 5; do jq ".inbounds[$i].settings.clients += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
+    
+    # Sub file with raw links
+    cat <<EOF > $SUB_DIR/$USERNAME
+vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USERNAME-VWS
+vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USERNAME-VGRPC
+vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USERNAME-VUPG
+vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=stream#$USERNAME-XHTTP
+trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USERNAME-TWS
+trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USERNAME-TGRPC
+trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-upgrade&security=tls&type=httpupgrade#$USERNAME-TUPG
+EOF
+
     systemctl restart xray
     show_links "$USERNAME" "$UUID" "$PASS"
 }
 
 show_links() {
     local USER=$1; local UUID=$2; local PASS=$3; local DOMAIN=$(cat $DOMAIN_FILE)
+    local SUB_LINK="https://$DOMAIN/sub/$USER"
     clear
-    echo -e "${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "  ${GREEN}MIHOMO / CLASH META CONFIG FOR:${NC} ${YELLOW}$USER${NC}"
-    echo -e "├──────────────────────────────────────────────────────────┤"
+    show_header
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "  ${BRIGHT_GREEN}TARGET:${NC} ${YELLOW}$USER${NC}"
+    echo -e "╠══════════════════════════════════════════════════════════╣"
+    echo -e "  ${MAGENTA}REMOTE SUBSCRIPTION (RAW LINKS)${NC}"
+    echo -e "  ${WHITE}$SUB_LINK${NC}"
+    echo -e "╠══════════════════════════════════════════════════════════╣"
+    echo -e "  ${CYAN}MIHOMO / CLASH META YAML CONFIGURATION${NC}"
+    echo -e "  ${NC}────────────────────────────────────────────────────────"
     cat <<EOF
 proxies:
   - name: $USER-vless-ws
@@ -269,17 +264,80 @@ proxies:
       grpc-service-name: trojan-grpc
     udp: true
 EOF
-    echo -e "└──────────────────────────────────────────────────────────┘"
-    read -p "Tekan Enter..."
+    echo -e "╚══════════════════════════════════════════════════════════╝"
+    read -p "  Press Enter..."
     menu_users
 }
 
+# ==========================================
+# VERTICAL MENUS
+# ==========================================
+menu_users() {
+    clear
+    show_header
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "║                ${MAGENTA}DATABASE USER MANAGEMENT${NC}               ║"
+    echo -e "╠══════════════════════════════════════════════════════════╣"
+    echo -e "║  ${CYAN}[01]${NC} INJECT NEW TARGET (ADD USER)                     ║"
+    echo -e "║  ${CYAN}[02]${NC} PURGE TARGET (DELETE USER)                       ║"
+    echo -e "║  ${CYAN}[03]${NC} EXTRACT CLIENT LINKS (LIST USERS)                ║"
+    echo -e "║  ${CYAN}[04]${NC} RETURN TO CORE MENU                              ║"
+    echo -e "╚══════════════════════════════════════════════════════════╝"
+    echo -ne "  ${BRIGHT_GREEN}admin@database:${NC}${CYAN}#${NC} "
+    read opt
+    case $opt in
+        1|01) add_user ;;
+        2|02) del_user ;;
+        3|03) list_user ;;
+        4|04) main_menu ;;
+        *) menu_users ;;
+    esac
+}
+
+main_menu() {
+    clear
+    show_header
+    DOMAIN=$(cat $DOMAIN_FILE 2>/dev/null || echo "OFFLINE")
+    RAM=$(free -m | awk '/Mem:/ { print $3 "/" $2 "MB" }')
+    CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%
+    UPTIME=$(uptime -p)
+
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "║  ${BRIGHT_GREEN}SYSTEM OPERATIONAL STATUS${NC}                            ║"
+    echo -e "╠══════════════════════════════════════════════════════════╣"
+    echo -e "║  [${GREEN}●${NC}] NODE     : ${WHITE}$DOMAIN${NC}"
+    echo -e "║  [${GREEN}●${NC}] MEMORY   : ${WHITE}$RAM${NC}"
+    echo -e "║  [${GREEN}●${NC}] LOAD     : ${WHITE}$CPU Usage${NC}"
+    echo -e "║  [${GREEN}●${NC}] UPTIME   : ${WHITE}$UPTIME${NC}"
+    echo -e "╠══════════════════════════════════════════════════════════╣"
+    echo -e "║  ${MAGENTA}AVAILABLE COMMANDS:${NC}                                    ║"
+    echo -e "║  ${CYAN}[01]${NC} ACCESS USER MANAGEMENT                           ║"
+    echo -e "║  ${CYAN}[02]${NC} RUN SERVICE DIAGNOSTICS                          ║"
+    echo -e "║  ${RED}[RR]${NC} SYSTEM REINSTALL (PURGE ALL DATA)                ║"
+    echo -e "║  ${CYAN}[00]${NC} TERMINATE SESSION                                ║"
+    echo -e "╚══════════════════════════════════════════════════════════╝"
+    echo -ne "  ${BRIGHT_GREEN}root@xray-vps:${NC}${CYAN}#${NC} "
+    read opt
+    case $opt in
+        1|01) menu_users ;;
+        2|02) check_services ;;
+        rr|RR) reinstall_script ;;
+        0|00) exit ;;
+        *) main_menu ;;
+    esac
+}
+
+# ==========================================
+# Helpers
+# ==========================================
 list_user() {
     clear
+    show_header
     USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
     [[ -z "$USERS" ]] && menu_users
-    select USERNAME in $USERS "Kembali"; do
-        [[ "$USERNAME" == "Kembali" ]] && menu_users
+    echo -e "${YELLOW}[?] Select Target Profile:${NC}"
+    select USERNAME in $USERS "CANCEL"; do
+        [[ "$USERNAME" == "CANCEL" ]] && menu_users
         UUID=$(jq -r ".inbounds[0].settings.clients[] | select(.email==\"$USERNAME\") | .id" $CONFIG_XRAY)
         PASS=$(jq -r ".inbounds[1].settings.clients[] | select(.email==\"$USERNAME\") | .password" $CONFIG_XRAY)
         show_links "$USERNAME" "$UUID" "$PASS"; break
@@ -288,50 +346,22 @@ list_user() {
 
 del_user() {
     clear
+    show_header
     USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
-    select USERNAME in $USERS "Batal"; do
-        [[ "$USERNAME" == "Batal" ]] && menu_users
+    select USERNAME in $USERS "CANCEL"; do
+        [[ "$USERNAME" == "CANCEL" ]] && menu_users
         for i in {0..6}; do jq ".inbounds[$i].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
+        rm -f $SUB_DIR/$USERNAME
         systemctl restart xray; menu_users; break
     done
 }
 
-# --- Dashboard Utama ---
-
-main_menu() {
-    clear
-    DOMAIN=$(cat $DOMAIN_FILE 2>/dev/null || echo "Belum Setup")
-    RAM=$(free -m | awk '/Mem:/ { print $3 "MB / " $2 "MB" }')
-    CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%
-
-    echo -e "${BLUE}┌──────────────────────────────────────────────────────────┐${NC}"
-    echo -e "│                ${GREEN}XRAY ULTIMATE DASHBOARD${NC}                 │"
-    echo -e "├──────────────────────────────────────────────────────────┤"
-    echo -e "│  ${YELLOW}DOMAIN${NC}  : $DOMAIN"
-    echo -e "│  ${YELLOW}RAM${NC}     : $RAM"
-    echo -e "│  ${YELLOW}CPU${NC}     : $CPU Usage"
-    echo -e "├──────────────────────────────────────────────────────────┤"
-    echo -e "│  ${CYAN}[1]${NC} Management Users                            │"
-    echo -e "│  ${CYAN}[2]${NC} Check Services                              │"
-    echo -e "│  ${PURPLE}[R]${NC} Reinstall Script (Reset Total)               │"
-    echo -e "│  ${CYAN}[3]${NC} Quit (Exit)                                 │"
-    echo -e "└──────────────────────────────────────────────────────────┘"
-    echo -ne "  ${YELLOW}Pilih menu:${NC} "
-    read opt
-    case $opt in
-        1) menu_users ;;
-        2) check_services ;;
-        [rR]) reinstall_script ;;
-        3) exit ;;
-        *) main_menu ;;
-    esac
-}
-
 check_services() {
     clear
+    show_header
     echo -e "Xray  : $(systemctl is-active xray)"
     echo -e "Nginx : $(systemctl is-active nginx)"
-    read -p "Enter..."
+    read -p "  Press Enter..."
     main_menu
 }
 
