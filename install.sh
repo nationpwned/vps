@@ -1,220 +1,234 @@
 #!/bin/bash
 
-set -e
+CONFIG_XRAY="/usr/local/etc/xray/config.json"
+CONFIG_NGINX="/etc/nginx/sites-available/xray"
+NGINX_LINK="/etc/nginx/sites-enabled/xray"
+DOMAIN_FILE="/usr/local/etc/xray/domain.txt"
 
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root"
-  exit 1
-fi
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+NC='\033[0m'
 
-clear
-echo "================================="
-echo " INSTALL SSHVPN + BADVPN SERVER"
-echo "================================="
+setup_firewall() {
+    echo -e "${YELLOW}Mengonfigurasi Firewall (UFW)...${NC}"
+    apt update && apt install -y ufw
+    ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp
+    echo "y" | ufw enable
+}
 
-if [ -f /usr/bin/badvpn-udpgw ]; then
-  echo "BadVPN binary already exists, skipping installation..."
-else
-  apt update -y
-  apt install python3-full -y
-  echo "Downloading BadVPN binaries..."
+reinstall_script() {
+    clear
+    echo -e "${RED}┌──────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${RED}│${NC}                ${WHITE}WARNING: REINSTALL SYSTEM${NC}                 ${RED}│${NC}"
+    echo -e "${RED}├──────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${RED}│${NC} Semua data user, SSL, dan konfigurasi akan DIHAPUS!     ${RED}│${NC}"
+    echo -e "${RED}└──────────────────────────────────────────────────────────┘${NC}"
+    read -p "  Apakah Anda yakin? (y/n): " confirm
+    if [[ $confirm == [yY] ]]; then
+        echo -e "${YELLOW}Membersihkan sistem...${NC}"
+        systemctl stop xray nginx 2>/dev/null
+        rm -rf /usr/local/etc/xray/
+        rm -f $CONFIG_NGINX $NGINX_LINK
+        echo -e "${GREEN}Pembersihan selesai. Memulai instalasi ulang...${NC}"
+        sleep 2
+        install_all
+    else
+        main_menu
+    fi
+}
 
-  # Setup Domain
-  echo "===== SETUP DOMAIN ====="
-  read -p "Masukkan Domain/Subdomain: " DOMAIN
-  echo "$DOMAIN" > /etc/sshvpn_domain
-  echo "Domain $DOMAIN berhasil disimpan."
-  echo ""
+install_all() {
+    clear
+    echo -e "${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC}                ${WHITE}INITIAL INSTALLATION${NC}                  ${CYAN}│${NC}"
+    echo -e "${CYAN}└──────────────────────────────────────────────────────────┘${NC}"
+    
+    read -p "  Masukkan Domain Anda : " DOMAIN
+    read -p "  Masukkan Email SSL   : " EMAIL
+    if [[ -z "$DOMAIN" || -z "$EMAIL" ]]; then echo -e "${RED}Error: Data tidak lengkap!${NC}"; exit 1; fi
+    
+    setup_firewall
+    systemctl stop apache2 2>/dev/null && apt remove -y apache2 2>/dev/null
 
-  wget -O /usr/bin/badvpn-client https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-client
-  wget -O /usr/bin/badvpn-flooder https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-flooder
-  wget -O /usr/bin/badvpn-ncd https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-ncd
-  wget -O /usr/bin/badvpn-ncd-request https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-ncd-request
-  wget -O /usr/bin/badvpn-server https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-server
-  wget -O /usr/bin/badvpn-tun2socks https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-tun2socks
-  wget -O /usr/bin/badvpn-tunctl https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-tunctl
-  wget -O /usr/bin/badvpn-udpgw https://github.com/nationpwned/vps/raw/refs/heads/sshvpn/badvpn/badvpn-udpgw
+    echo -e "\n${YELLOW}Installing Xray-core & Nginx...${NC}"
+    apt update && apt install -y nginx jq curl socat certbot python3-certbot-nginx
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 
-  wget -O /usr/bin/sshsocksvpn https://raw.githubusercontent.com/nationpwned/vps/refs/heads/sshvpn/sshsocksvpn/sshsocksvpn
+    mkdir -p /usr/local/etc/xray/
 
-  chmod +x /usr/bin/badvpn-*
-  chmod +x /usr/bin/sshsocksvpn
+    cat <<EOF > $CONFIG_NGINX
+server { listen 80; server_name $DOMAIN; root /var/www/html; }
+EOF
+    ln -sf $CONFIG_NGINX $NGINX_LINK
+    rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+    systemctl restart nginx
 
-  echo "Creating BadVPN UDPGW service..."
+    echo -e "${YELLOW}Mengurus Sertifikat SSL...${NC}"
+    certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
 
-  cat <<EOF >/etc/systemd/system/badvpn.service
-[Unit]
-Description=BadVPN UDPGW
-After=network.target
+    cat <<EOF > $CONFIG_NGINX
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
-[Service]
-ExecStart=/usr/bin/badvpn-udpgw --listen-addr 0.0.0.0:7300 --max-clients 2000 --max-connections-for-client 20
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+    location /vless-ws { proxy_pass http://127.0.0.1:10001; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
+    location /trojan-ws { proxy_pass http://127.0.0.1:10002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
+    location /vless-grpc { if (\$request_method != "POST") { return 404; } client_max_body_size 0; grpc_pass grpc://127.0.0.1:10003; }
+    location /trojan-grpc { if (\$request_method != "POST") { return 404; } client_max_body_size 0; grpc_pass grpc://127.0.0.1:10004; }
+    location /vless-upgrade { proxy_pass http://127.0.0.1:10005; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
+    location /trojan-upgrade { proxy_pass http://127.0.0.1:10006; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
+    location /xhttp { proxy_pass http://127.0.0.1:10007; proxy_http_version 1.1; proxy_set_header Host \$host; }
+}
 EOF
 
-  ufw allow 7300/udp
-  ufw allow 7300/tcp
+NEW_UUID=$(cat /proc/sys/kernel/random/uuid)
+NEW_PASS=$(openssl rand -hex 6)
 
-  systemctl daemon-reload
-  systemctl enable badvpn
-  systemctl restart badvpn
-
-  echo "Installing SSH manager..."
-
-  cat <<'EOF' >/usr/bin/sshvpn
-#!/bin/bash
-
-clear
-
-function add_user(){
-
-echo "===== ADD USER ====="
-read -p "Username: " user
-
-if id "$user" &>/dev/null; then
-  echo "Error: User '$user' already exists!"
-else
-  read -p "Password: " pass
-  read -p "Expired (days) [kosongkan untuk unlimited]: " days
-
-  if [[ -z "$days" || "$days" == "0" ]]; then
-    exp="2099-12-31"
-    exp_label="Unlimited"
-    useradd -e $exp -s /bin/false -m $user
-  else
-    exp=$(date -d "$days days" +"%Y-%m-%d")
-    exp_label="$exp"
-    useradd -e $exp -s /bin/false -m $user
-  fi
-
-  echo "$user:$pass" | chpasswd
-
-  USER_HOME="/home/$user"
-  mkdir -p "$USER_HOME/.ssh"
-  ssh-keygen -t rsa -b 2048 -f "$USER_HOME/.ssh/id_rsa" -q -N ""
-  
-  cat "$USER_HOME/.ssh/id_rsa.pub" >> "$USER_HOME/.ssh/authorized_keys"
-  chmod 700 "$USER_HOME/.ssh"
-  chmod 600 "$USER_HOME/.ssh/authorized_keys"
-  chown -R $user:$user "$USER_HOME/.ssh"
-
-  PRIVATE_KEY=$(cat "$USER_HOME/.ssh/id_rsa")
-  
-  HOST_KEY=$(awk '{print $1" "$2}' /etc/ssh/ssh_host_rsa_key.pub 2>/dev/null)
-  
-  MYIP=$(curl -sS ipv4.icanhazip.com)
-  
-  if [ -f /etc/sshvpn_domain ]; then
-    DOMAIN=$(cat /etc/sshvpn_domain)
-  else
-    DOMAIN=$MYIP
-  fi
-  
-  BUG="support.zoom.us"
-  SNI="${BUG}.@${DOMAIN}"
-  
-  OUT_DIR="/home/${USER}/client"
-  mkdir -p "$OUT_DIR"
-  OUT_FILE="${OUT_DIR}/${user}.txt"
-
-  CONFIG_TXT="User created successfully
--------------------------
-Username   : $user
-Password   : $pass
-Expired    : $exp_label
--------------------------
-Host/IP    : $MYIP
-Domain     : $DOMAIN
-Port SSH   : 22
-Port UDPGW : 7300
--------------------------
-Bug / Host : $BUG
-SNI / SN   : $SNI
--------------------------
-Config Mihomo (Clash Meta) with Private/Host Key:
-proxies:
-  - name: SSH-$user
-    type: ssh
-    server: $SNI
-    port: 22
-    username: $user
-    password: $pass
-    private-key: |
-$(echo "$PRIVATE_KEY" | sed 's/^/      /')
-    host-key:
-      - \"$HOST_KEY\"
-    host-key-algorithms:
-      - ssh-rsa
-    udp: true
--------------------------"
-
-  echo "$CONFIG_TXT" | tee "$OUT_FILE"
-  echo ""
-  echo "=> Config tersimpan di: $OUT_FILE"
-fi
-
+sudo cat <<EOF > /usr/local/etc/xray/config.json
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [
+    { "port": 10001, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless-ws" } } },
+    { "port": 10002, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$NEW_PASS", "email": "admin"}] }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan-ws" } } },
+    { "port": 10003, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } } },
+    { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$NEW_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
+    { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
+    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$NEW_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
+    { "port": 10007, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$NEW_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "xhttp", "xhttpSettings": { "path": "/xhttp" } } }
+  ],
+  "outbounds": [{ "protocol": "freedom" }]
 }
-
-function del_user(){
-
-echo "===== DELETE USER ====="
-read -p "Username: " user
-
-if id "$user" &>/dev/null; then
-  killall -u $user 2>/dev/null || true
-  userdel -f $user
-  echo "User '$user' has been deleted successfully."
-else
-  echo "Error: User '$user' not found."
-fi
-
-}
-
-function list_user(){
-
-echo "===== LIST USER ====="
-
-awk -F: '$3 >= 1000 && $1!="nobody" {print $1}' /etc/passwd | while read user
-do
-exp=$(chage -l $user | grep "Account expires" | cut -d: -f2)
-echo "$user | Expire:$exp"
-done
-
-}
-
-echo "==========================="
-echo "         SSH MENU"
-echo "==========================="
-echo "1. Add User"
-echo "2. Delete User"
-echo "3. List User"
-echo "4. Exit"
-echo "==========================="
-read -p "Select: " menu
-
-case $menu in
-1) add_user ;;
-2) del_user ;;
-3) list_user ;;
-4) exit ;;
-*) echo "Invalid" ;;
-esac
 EOF
 
-  chmod +x /usr/bin/sshvpn
+    echo "$DOMAIN" > "$DOMAIN_FILE"
+    systemctl restart nginx && systemctl restart xray
+    echo -e "${GREEN}Instalasi Selesai!${NC}"
+    sleep 2
+    main_menu
+}
 
-  echo ""
-  echo "================================="
-  echo "BadVPN UDPGW running on port 7300"
-  echo "Open SSH manager with command:"
-  echo "sshvpn"
-  echo "================================="
-fi
+add_user() {
+    echo -ne "  ${YELLOW}Nama User Baru:${NC} "
+    read USERNAME
+    if [[ -z "$USERNAME" ]]; then return; fi
+    UUID=$(cat /proc/sys/kernel/random/uuid)
+    PASS="${USERNAME}$(shuf -i 100-999 -n 1)"
+    for i in 0 2 4 6; do jq ".inbounds[$i].settings.clients += [{\"id\": \"$UUID\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
+    for i in 1 3 5; do jq ".inbounds[$i].settings.clients += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
+    systemctl restart xray
+    show_links "$USERNAME" "$UUID" "$PASS"
+}
 
-echo ""
-echo "Entering SSH Menu..."
-sleep 2
-sshvpn
+show_links() {
+    local USER=$1; local UUID=$2; local PASS=$3; local DOMAIN=$(cat $DOMAIN_FILE)
+    clear
+    echo -e "${CYAN}┌──────────────────────────────────────────────────────────┐${NC}"
+    echo -e "  ${GREEN}CONFIG LINKS FOR USER:${NC} ${YELLOW}$USER${NC}"
+    echo -e "${CYAN}├──────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BLUE}[ VLESS ]${NC}"
+    echo -e " WS      : vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#$USER-VLESS-ws"
+    echo -e " gRPC    : vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encryption=none&type=grpc#$USER-VLESS-grpc"
+    echo -e " Upgrade : vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#$USER-VLESS-upgrade"
+    echo -e " XHTTP   : vless://$UUID@$DOMAIN:443?path=%2Fxhttp&security=tls&encryption=none&type=xhttp&mode=packet-streamed#$USER-VLESS-xhttp"
+    echo -e ""
+    echo -e "${BLUE}[ TROJAN ]${NC}"
+    echo -e " WS      : trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#$USER-TROJAN-ws"
+    echo -e " gRPC    : trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#$USER-TROJAN-grpc"
+    echo -e " Upgrade : trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-upgrade&security=tls&type=httpupgrade#$USER-TROJAN-upgrade"
+    echo -e "${CYAN}└──────────────────────────────────────────────────────────┘${NC}"
+    read -p "Tekan Enter..."
+    main_menu
+}
+
+list_user() {
+    clear
+    USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
+    if [[ -z "$USERS" ]]; then echo -e "${RED}Kosong.${NC}"; sleep 2; main_menu; return; fi
+    echo -e "${YELLOW}Pilih user:${NC}"
+    select USERNAME in $USERS "Kembali"; do
+        if [ "$USERNAME" == "Kembali" ]; then main_menu; break; fi
+        UUID=$(jq -r ".inbounds[0].settings.clients[] | select(.email==\"$USERNAME\") | .id" $CONFIG_XRAY)
+        PASS=$(jq -r ".inbounds[1].settings.clients[] | select(.email==\"$USERNAME\") | .password" $CONFIG_XRAY)
+        show_links "$USERNAME" "$UUID" "$PASS"; break
+    done
+}
+
+del_user() {
+    clear
+    USERS=$(jq -r '.inbounds[0].settings.clients[].email' $CONFIG_XRAY)
+    echo -e "${RED}Pilih user untuk dihapus:${NC}"
+    select USERNAME in $USERS "Batal"; do
+        if [ "$USERNAME" == "Batal" ]; then main_menu; break; fi
+        for i in {0..6}; do jq ".inbounds[$i].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
+        systemctl restart xray
+        echo -e "${GREEN}User $USERNAME dihapus.${NC}"
+        sleep 2; main_menu; break
+    done
+}
+
+check_services() {
+    clear
+    echo -e "${BLUE}┌───────────────────────────┐${NC}"
+    echo -e "${BLUE}│${NC}      SERVICE STATUS       ${BLUE}│${NC}"
+    echo -e "${BLUE}├───────────────────────────┤${NC}"
+    echo -ne "${BLUE}│${NC} Xray  : "
+    if systemctl is-active --quiet xray; then echo -e "${GREEN}RUNNING${NC}     ${BLUE}│${NC}"; else echo -e "${RED}STOPPED${NC}     ${BLUE}│${NC}"; fi
+    echo -ne "${BLUE}│${NC} Nginx : "
+    if systemctl is-active --quiet nginx; then echo -e "${GREEN}RUNNING${NC}     ${BLUE}│${NC}"; else echo -e "${RED}STOPPED${NC}     ${BLUE}│${NC}"; fi
+    echo -e "${BLUE}└───────────────────────────┘${NC}"
+    read -p "Tekan Enter..."
+    main_menu
+}
+
+main_menu() {
+    clear
+    DOMAIN=$(cat $DOMAIN_FILE 2>/dev/null || echo "Belum Setup")
+    OS=$(cat /etc/os-release | grep -w PRETTY_NAME | cut -d= -f2 | tr -d '"')
+    RAM=$(free -m | awk '/Mem:/ { print $3 "MB / " $2 "MB" }')
+    CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')%
+
+    echo -e "${BLUE}┌──────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${BLUE}│${NC}                ${GREEN}XRAY ULTIMATE DASHBOARD${NC}                 ${BLUE}│${NC}"
+    echo -e "${BLUE}├──────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BLUE}│${NC}  ${YELLOW}OS${NC}      : $OS"
+    echo -e "${BLUE}│${NC}  ${YELLOW}DOMAIN${NC}  : $DOMAIN"
+    echo -e "${BLUE}│${NC}  ${YELLOW}RAM${NC}     : $RAM"
+    echo -e "${BLUE}│${NC}  ${YELLOW}CPU${NC}     : $CPU Usage"
+    echo -e "${BLUE}├──────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${BLUE}│${NC}  ${CYAN}[1]${NC} Tambah User Baru (All Protocols)             ${BLUE}│${NC}"
+    echo -e "${BLUE}│${NC}  ${CYAN}[2]${NC} Hapus User Aktif                             ${BLUE}│${NC}"
+    echo -e "${BLUE}│${NC}  ${CYAN}[3]${NC} Lihat Daftar User & Share Link               ${BLUE}│${NC}"
+    echo -e "${BLUE}│${NC}  ${CYAN}[4]${NC} Cek Status Service Sistem                    ${BLUE}│${NC}"
+    echo -e "${BLUE}│${NC}  ${PURPLE}[R]${NC} Reinstall Script (Reset Total)               ${BLUE}│${NC}"
+    echo -e "${BLUE}│${NC}  ${CYAN}[5]${NC} Keluar (Exit)                                ${BLUE}│${NC}"
+    echo -e "${BLUE}└──────────────────────────────────────────────────────────┘${NC}"
+    echo -ne "  ${YELLOW}Pilih menu:${NC} "
+    read opt
+    case $opt in
+        1) add_user ;;
+        2) del_user ;;
+        3) list_user ;;
+        4) check_services ;;
+        [rR]) reinstall_script ;;
+        5) exit ;;
+        *) main_menu ;;
+    esac
+}
+
+check_install() {
+    if [[ -f "$CONFIG_XRAY" ]]; then
+        main_menu
+    else
+        echo -e "${YELLOW}Sistem belum terinstal. Memulai setup awal...${NC}"
+        install_all
+    fi
+}
+
+check_install
