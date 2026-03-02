@@ -1,6 +1,6 @@
 ```
-curl -fsSL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/script/install.sh -o install
-chmod +x install
+curl -fsSL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/script/install.sh -o vps
+chmod +x vps
 
-sudo su -c "./install"
+sudo su -c "./vps"
 ```
