@@ -5,4 +5,6 @@ chmod +x vps
 sudo su -c "./vps"
 
 mv vps /usr/bin/vps
+
+sudo warp-cli status (accept tos)
 ```
