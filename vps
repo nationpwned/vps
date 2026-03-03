@@ -107,31 +107,14 @@ EOF
     { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } }
   ],
   "outbounds": [
-    {
-      "protocol": "socks",
-      "settings": {
-        "servers": [{ "address": "127.0.0.1", "port": 40000 }]
-      },
-      "tag": "warp"
-    },
-    {
-      "protocol": "freedom",
-      "tag": "direct"
-    }
+    { "protocol": "socks", "settings": { "servers": [{ "address": "127.0.0.1", "port": 40000 }] }, "tag": "warp" },
+    { "protocol": "freedom", "tag": "direct" }
   ],
   "routing": {
     "domainStrategy": "AsIs",
     "rules": [
-      {
-        "type": "field",
-        "outboundTag": "direct",
-        "ip": ["geoip:private"]
-      },
-      {
-        "type": "field",
-        "outboundTag": "warp",
-        "network": "tcp,udp"
-      }
+      { "type": "field", "outboundTag": "direct", "ip": ["geoip:private"] },
+      { "type": "field", "outboundTag": "warp", "network": "tcp,udp" }
     ]
   }
 }
