@@ -104,7 +104,7 @@ EOF
     { "port": 10003, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } } },
     { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
     { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
-    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
+    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } }
   ],
   "outbounds": [
     {
