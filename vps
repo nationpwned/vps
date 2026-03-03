@@ -166,7 +166,7 @@ EOF
         "clients": [
           {
             "id": "$ADMIN_UUID",
-            "email": "$USERNAME"
+            "email": "admin"
           }
         ],
         "decryption": "none"
@@ -186,7 +186,7 @@ EOF
         "clients": [
           {
             "password": "$ADMIN_PASS",
-            "email": "$USERNAME"
+            "email": "admin"
           }
         ]
       },
@@ -205,7 +205,7 @@ EOF
         "clients": [
           {
             "id": "$ADMIN_UUID",
-            "email": "$USERNAME"
+            "email": "admin"
           }
         ],
         "decryption": "none"
@@ -225,7 +225,7 @@ EOF
         "clients": [
           {
             "password": "$ADMIN_PASS",
-            "email": "$USERNAME"
+            "email": "admin"
           }
         ]
       },
@@ -244,7 +244,7 @@ EOF
         "clients": [
           {
             "id": "$ADMIN_UUID",
-            "email": "$USERNAME"
+            "email": "admin"
           }
         ],
         "decryption": "none"
@@ -264,7 +264,7 @@ EOF
         "clients": [
           {
             "password": "$ADMIN_PASS",
-            "email": "$USERNAME"
+            "email": "admin"
           }
         ]
       },
@@ -282,7 +282,14 @@ EOF
       "settings": {
         "method": "chacha20-ietf-poly1305",
         "password": "$ADMIN_PASS",
-        "network": "tcp,udp"
+        "network": "tcp,udp",
+        "clients": [
+          {
+            "method": "chacha20-ietf-poly1305",
+            "password": "$ADMIN_PASS",
+            "email": "admin"
+          }
+        ]
       },
       "streamSettings": {
         "network": "ws",
@@ -357,7 +364,7 @@ add_user() {
     for i in 1 3 5; do 
         jq ".inbounds[$i].settings.clients += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY
     done
-    jq ".inbounds[6].settings.users += [{\"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY
+    jq ".inbounds[6].settings.clients += [{\"method\": \"chacha20-ietf-poly1305\", \"password\": \"$PASS\", \"email\": \"$USERNAME\"}]" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY
     
     cat <<EOF > $SUB_DIR/$USERNAME
 vless://$UUID@$DOMAIN:443?path=%2Fvless-ws&security=tls&encryption=none&type=ws#vless-ws
@@ -365,7 +372,7 @@ vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encrypt
 vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#vless-upgrade
 trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#trojan-ws
 trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#trojan-grpc
-ss://$(echo -n "chacha20-ietf-poly1305:$PASS" | base64)@$DOMAIN:443?plugin=v2ray-plugin;mode=websocket;tls;path=/shadowsocks-ws;host=$DOMAIN#MPTCP-BONDING-WS
+ss://$(echo -n "chacha20-ietf-poly1305:$PASS" | base64 -w 0)@$DOMAIN:443?plugin=v2ray-plugin;mode=websocket;tls;path=/shadowsocks-ws;host=$DOMAIN#MPTCP-BONDING-WS
 EOF
     systemctl restart xray
     show_links "$USERNAME" "$UUID" "$PASS"
@@ -572,7 +579,7 @@ del_user() {
         [[ "$USERNAME" == "CANCEL" ]] && menu_users
         for i in 0 2 4; do jq ".inbounds[$i].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
         for i in 1 3 5; do jq ".inbounds[$i].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY; done
-        jq ".inbounds[6].settings.users |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY
+        jq ".inbounds[6].settings.clients |= del(.[] | select(.email == \"$USERNAME\"))" $CONFIG_XRAY > tmp.json && mv tmp.json $CONFIG_XRAY
         rm -f $SUB_DIR/$USERNAME
         systemctl restart xray; menu_users; break
     done
