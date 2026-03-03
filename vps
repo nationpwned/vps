@@ -91,20 +91,26 @@ EOF
     install_warp
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
     
-    # Init Config Xray (Outbound WARP)
-    ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
-    ADMIN_PASS=$(openssl rand -hex 6)
-    # Init Config Xray (Full WARP Outbound)
-    cat <<EOF > $CONFIG_XRAY
+mkdir -p $(dirname "$CONFIG_XRAY")
+
+ADMIN_UUID=$(cat /proc/sys/kernel/random/uuid)
+ADMIN_PASS=$(openssl rand -hex 6)
+
+if [[ -z "$ADMIN_UUID" || -z "$ADMIN_PASS" ]]; then
+    echo "Error: Gagal generate UUID atau Password!"
+    exit 1
+fi
+
+cat <<EOF > $CONFIG_XRAY
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
-    { "port": 10001, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless-ws" } } },
-    { "port": 10002, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan-ws" } } },
-    { "port": 10003, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } } },
-    { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
-    { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
-    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } }
+    { "port": 10001, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "sibondt"}], "decryption": "none" }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless-ws" } } },
+    { "port": 10002, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "sibondt"}] }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan-ws" } } },
+    { "port": 10003, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "sibondt"}], "decryption": "none" }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } } },
+    { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "sibondt"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
+    { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "sibondt"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
+    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "sibondt"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } }
   ],
   "outbounds": [
     { "protocol": "socks", "settings": { "servers": [{ "address": "127.0.0.1", "port": 40000 }] }, "tag": "warp" },
@@ -119,6 +125,14 @@ EOF
   }
 }
 EOF
+
+if xray -test -config "$CONFIG_XRAY" > /dev/null 2>&1; then
+    echo "Konfigurasi Xray Berhasil Dibuat!"
+    echo "UUID: $ADMIN_UUID"
+    echo "PASS: $ADMIN_PASS"
+else
+    echo "Konfigurasi Xray Gagal!"
+fi
     echo "$DOMAIN" > "$DOMAIN_FILE"
     systemctl restart xray
     main_menu
