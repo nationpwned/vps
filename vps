@@ -142,6 +142,7 @@ EOF
     ufw allow 10004
     ufw allow 10005
     ufw allow 10006
+    ufw allow 10007
     ufw allow 40000
     ufw allow 5201
     echo "y" | ufw enable
