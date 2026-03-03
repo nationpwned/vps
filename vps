@@ -94,6 +94,7 @@ server {
     location /trojan-grpc { if (\$request_method != "POST") { return 404; } client_max_body_size 0; grpc_pass grpc://127.0.0.1:10004; }
     location /vless-upgrade { proxy_pass http://127.0.0.1:10005; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
     location /trojan-upgrade { proxy_pass http://127.0.0.1:10006; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
+    location /shadowsocks-ws { proxy_pass http://127.0.0.1:10007; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection "upgrade"; proxy_set_header Host \$host; }
 }
 EOF
     systemctl restart nginx
@@ -116,7 +117,8 @@ EOF
     { "port": 10003, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "vless-grpc" } } },
     { "port": 10004, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "grpc", "grpcSettings": { "serviceName": "trojan-grpc" } } },
     { "port": 10005, "listen": "127.0.0.1", "protocol": "vless", "settings": { "clients": [{"id": "$ADMIN_UUID", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/vless-upgrade" } } },
-    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } }
+    { "port": 10006, "listen": "127.0.0.1", "protocol": "trojan", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}] }, "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/trojan-upgrade" } } },
+    { "port": 10007, "listen": "127.0.0.1", "protocol": "shadowsocks", "settings": { "clients": [{"password": "$ADMIN_PASS", "email": "admin"}], "decryption": "none" }, "streamSettings": { "network": "ws", "wsSettings": { "path": "/shadowsocks-ws" } } }
   ],
   "outbounds": [
     { "protocol": "socks", "settings": { "servers": [{ "address": "127.0.0.1", "port": 40000 }] }, "tag": "warp" },
@@ -188,6 +190,7 @@ vless://$UUID@$DOMAIN:443?mode=multi&serviceName=vless-grpc&security=tls&encrypt
 vless://$UUID@$DOMAIN:443?path=%2Fvless-upgrade&security=tls&encryption=none&type=httpupgrade#vless-upgrade
 trojan://$PASS@$DOMAIN:443?path=%2Ftrojan-ws&security=tls&type=ws#trojan-ws
 trojan://$PASS@$DOMAIN:443?mode=multi&serviceName=trojan-grpc&security=tls&type=grpc#trojan-grpc
+ss://$PASS@$DOMAIN:10007?encryption=aes-256-gcm&obfs=http&obfs-uri=/&mptcp=true#mptcp-ss
 EOF
     systemctl restart xray
     show_links "$USERNAME" "$UUID" "$PASS"
@@ -297,6 +300,14 @@ proxies:
     grpc-opts:
       grpc-service-name: trojan-grpc
     udp: true
+
+  - name: MPTCP-SHADOWSOCKS-SG
+    type: ss
+    server: $DOMAIN
+    port: 10007
+    cipher: aes-256-gcm
+    password: $PASS
+    mptcp: true
 EOF
     echo -e "╚══════════════════════════════════════════════════════════╝"
     read -p "  Press Enter..."
