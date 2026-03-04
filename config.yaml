@@ -1,0 +1,390 @@
+{
+  "log": {
+    "level": "warn",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "https",
+        "server": "8.8.8.8",
+        "detour": "🌐 Anonymous Multi",
+        "tag": "dns-remote"
+      },
+      {
+        "type": "udp",
+        "server": "8.8.8.8",
+        "server_port": 53,
+        "tag": "dns-direct"
+      },
+      {
+        "type": "fakeip",
+        "tag": "dns-fake",
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
+      }
+    ],
+    "rules": [
+      {
+        "domain": [
+          "raw.githubusercontent.com"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "clash_mode": "Direct",
+        "server": "dns-direct"
+      },
+      {
+        "clash_mode": "Global",
+        "server": "dns-remote"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": "geosite-ir"
+          },
+          {
+            "rule_set": "geoip-ir"
+          }
+        ],
+        "action": "route",
+        "server": "dns-direct"
+      },
+      {
+        "rule_set": [
+          "geosite-malware",
+          "geosite-phishing",
+          "geosite-cryptominers",
+          "geosite-category-ads-all"
+        ],
+        "action": "reject"
+      },
+      {
+        "disable_cache": true,
+        "inbound": "tun-in",
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "server": "dns-fake"
+      }
+    ],
+    "strategy": "ipv4_only",
+    "independent_cache": true
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.18.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "mtu": 9000,
+      "auto_route": true,
+      "strict_route": true,
+      "endpoint_independent_nat": true,
+      "stack": "mixed"
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "0.0.0.0",
+      "listen_port": 2080
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "🌐 Anonymous Multi",
+      "outbounds": [
+        "👽 Best Ping 🚀",
+        "VLESS-WS",
+        "VLESS-gRPC",
+        "VLESS-Upgrade",
+        "Trojan-WS",
+        "Trojan-gRPC",
+        "Trojan-Upgrade",
+        "direct"
+      ]
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "urltest",
+      "tag": "👽 Best Ping 🚀",
+      "outbounds": [
+        "VLESS-WS",
+        "VLESS-gRPC",
+        "VLESS-Upgrade",
+        "Trojan-WS",
+        "Trojan-gRPC",
+        "Trojan-Upgrade"
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interrupt_exist_connections": false,
+      "interval": "30s"
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS-WS",
+      "server": "$DOMAIN",
+      "server_port": 443,
+      "uuid": "8238e66b-3580-4645-8442-6fd9dd3a03f6",
+      "tls": {
+        "enabled": true,
+        "server_name": "$DOMAIN",
+        "insecure": false
+      },
+      "transport": {
+        "type": "ws",
+        "path": "/vless-ws",
+        "headers": {
+          "Host": "$DOMAIN"
+        }
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS-gRPC",
+      "server": "$DOMAIN",
+      "server_port": 443,
+      "uuid": "8238e66b-3580-4645-8442-6fd9dd3a03f6",
+      "tls": {
+        "enabled": true,
+        "server_name": "$DOMAIN",
+        "insecure": false
+      },
+      "transport": {
+        "type": "grpc",
+        "service_name": "vless-grpc"
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS-Upgrade",
+      "server": "$DOMAIN",
+      "server_port": 443,
+      "uuid": "8238e66b-3580-4645-8442-6fd9dd3a03f6",
+      "tls": {
+        "enabled": true,
+        "server_name": "$DOMAIN",
+        "insecure": false
+      },
+      "transport": {
+        "type": "httpupgrade",
+        "path": "/vless-httpupgrade",
+        "headers": {
+          "Host": "$DOMAIN"
+        }
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "Trojan-WS",
+      "server": "$DOMAIN",
+      "server_port": 443,
+      "password": "b1f6c0d82037",
+      "tls": {
+        "enabled": true,
+        "server_name": "$DOMAIN",
+        "insecure": false
+      },
+      "transport": {
+        "type": "ws",
+        "path": "/trojan-ws",
+        "headers": {
+          "Host": "$DOMAIN"
+        }
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "Trojan-gRPC",
+      "server": "$DOMAIN",
+      "server_port": 443,
+      "password": "b1f6c0d82037",
+      "tls": {
+        "enabled": true,
+        "server_name": "$DOMAIN",
+        "insecure": false
+      },
+      "transport": {
+        "type": "grpc",
+        "service_name": "trojan-grpc"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "Trojan-Upgrade",
+      "server": "$DOMAIN",
+      "server_port": 443,
+      "password": "b1f6c0d82037",
+      "tls": {
+        "enabled": true,
+        "server_name": "$DOMAIN",
+        "insecure": false
+      },
+      "transport": {
+        "type": "httpupgrade",
+        "path": "/trojan-httpupgrade",
+        "headers": {
+          "Host": "$DOMAIN"
+        }
+      }
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "ip_cidr": "172.18.0.2",
+        "action": "hijack-dns"
+      },
+      {
+        "clash_mode": "Direct",
+        "outbound": "direct"
+      },
+      {
+        "clash_mode": "Global",
+        "outbound": "🌐 Anonymous Multi"
+      },
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "network": "udp",
+        "action": "reject"
+      },
+      {
+        "rule_set": [
+          "geosite-malware",
+          "geosite-phishing",
+          "geosite-cryptominers",
+          "geosite-category-ads-all"
+        ],
+        "action": "reject"
+      },
+      {
+        "rule_set": [
+          "geoip-malware",
+          "geoip-phishing"
+        ],
+        "action": "reject"
+      },
+      {
+        "rule_set": [
+          "geosite-ir"
+        ],
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geoip-ir"
+        ],
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "direct"
+      }
+    ],
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geosite-malware",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-malware.srs",
+        "download_detour": "direct"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-malware",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-malware.srs",
+        "download_detour": "direct"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-phishing",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-phishing.srs",
+        "download_detour": "direct"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-phishing",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-phishing.srs",
+        "download_detour": "direct"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-cryptominers",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-cryptominers.srs",
+        "download_detour": "direct"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-category-ads-all",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-category-ads-all.srs",
+        "download_detour": "direct"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-ir",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geosite-ir.srs",
+        "download_detour": "direct"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-ir",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Chocolate4U/Iran-sing-box-rules/rule-set/geoip-ir.srs",
+        "download_detour": "direct"
+      }
+    ],
+    "auto_detect_interface": true,
+    "default_domain_resolver": {
+      "server": "dns-direct",
+      "strategy": "prefer_ipv4",
+      "rewrite_ttl": 60
+    },
+    "final": "🌐 Anonymous Multi"
+  },
+  "ntp": {
+    "enabled": true,
+    "server": "time.cloudflare.com",
+    "server_port": 123,
+    "domain_resolver": "dns-direct",
+    "interval": "30m",
+    "write_to_system": false
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "store_fakeip": true
+    },
+    "clash_api": {
+      "external_controller": "0.0.0.0:9090",
+      "external_ui": "ui",
+      "external_ui_download_url": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
+      "external_ui_download_detour": "direct",
+      "default_mode": "Rule"
+    }
+  }
+}
