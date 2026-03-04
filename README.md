@@ -1,5 +1,5 @@
 ```
-curl -fsSL https://raw.githubusercontent.com/nationpwned/vps/refs/heads/script/vps -o vps
+curl -fsSL https://github.com/nationpwned/vps/raw/refs/heads/singbox/vps -o vps
 chmod +x vps
 
 sudo su -c "./vps"
