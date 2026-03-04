@@ -318,10 +318,35 @@ install_dependencies() {
         fi
     fi
     
-    # Install Nginx
+    # Install Nginx from official repository (1.26+) to support all modern directives
     if ! command -v nginx >/dev/null 2>&1; then
-        log_info "Installing Nginx..."
-        apt install -y nginx
+        log_info "Installing Nginx from official nginx.org repository..."
+
+        # Remove any stale nginx configs that could cause startup failure during install
+        rm -f /etc/nginx/conf.d/proxy.conf
+
+        # Add official nginx signing key
+        curl -fsSL https://nginx.org/keys/nginx_signing.key \
+            | gpg --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg
+
+        # Add the official nginx stable repository
+        . /etc/os-release
+        if [[ "$ID" == "ubuntu" ]]; then
+            NGINX_DISTRO=$(lsb_release -cs)
+            NGINX_REPO="http://nginx.org/packages/ubuntu"
+        else
+            NGINX_DISTRO=$(lsb_release -cs)
+            NGINX_REPO="http://nginx.org/packages/debian"
+        fi
+        echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
+${NGINX_REPO} ${NGINX_DISTRO} nginx" > /etc/apt/sources.list.d/nginx.list
+
+        # Pin official packages to take priority over distro packages
+        printf 'Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n' \
+            > /etc/apt/preferences.d/99nginx
+
+        apt-get update -q
+        apt-get install -y nginx
         systemctl enable nginx
         systemctl stop nginx > /dev/null 2>&1 || true
     fi
