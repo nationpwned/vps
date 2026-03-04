@@ -1,0 +1,186 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "Trojan-WS",
+      "listen": "0.0.0.0",
+      "port": 10001,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [],
+        "fallbacks": []
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/trws",
+          "headers": {}
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "tag": "VLESS-WS",
+      "listen": "0.0.0.0",
+      "port": 10002,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": {
+          "path": "/vlws",
+          "headers": {}
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "tag": "Trojan-gRPC",
+      "listen": "0.0.0.0",
+      "port": 10003,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [],
+        "fallbacks": []
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "security": "none",
+        "grpcSettings": {
+          "serviceName": "TrGRPC",
+          "multiMode": false
+        }
+      },
+      "sniffing": {
+        "enabled": false
+      }
+    },
+    {
+      "tag": "VLESS-gRPC",
+      "listen": "0.0.0.0",
+      "port": 10004,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "security": "none",
+        "grpcSettings": {
+          "serviceName": "VlGRPC",
+          "multiMode": false
+        }
+      },
+      "sniffing": {
+        "enabled": false
+      }
+    },
+    {
+      "tag": "Trojan-HTTPUpgrade",
+      "listen": "0.0.0.0",
+      "port": 10005,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [],
+        "fallbacks": []
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "security": "none",
+        "httpupgradeSettings": {
+          "path": "/trhup",
+          "host": ""
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "tag": "VLESS-HTTPUpgrade",
+      "listen": "0.0.0.0",
+      "port": 10006,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "security": "none",
+        "httpupgradeSettings": {
+          "path": "/vlhup",
+          "host": ""
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "tag": "VLESS-XHTTP",
+      "listen": "0.0.0.0",
+      "port": 10007,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "none",
+        "xhttpSettings": {
+          "path": "/vlxhttp",
+          "mode": "auto"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "DIRECT",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "BLOCK",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "BLOCK"
+      },
+      {
+        "type": "field",
+        "domain": ["geosite:category-ads-all"],
+        "outboundTag": "BLOCK"
+      }
+    ]
+  }
+}

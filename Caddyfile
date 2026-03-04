@@ -1,0 +1,151 @@
+# Caddy Reverse Proxy for Remnawave
+# Multi-domain configuration
+
+# Global options - enable HTTP/3 (QUIC)
+{
+    servers {
+        protocols h1 h2 h3
+    }
+}
+
+# Panel domain
+https://{$PANEL_DOMAIN} {
+    # Enable compression (zstd preferred, gzip fallback)
+    encode zstd gzip
+
+    reverse_proxy remnawave:{$PANEL_PORT} {
+        header_up X-Real-IP {remote_host}
+        header_up Host {host}
+    }
+
+    log {
+        output file /var/log/caddy/panel.log {
+            roll_size 30mb
+            roll_keep 10
+            roll_keep_for 720h
+        }
+    }
+}
+
+# Subscription page domain
+https://{$SUB_DOMAIN} {
+    # Enable compression (zstd preferred, gzip fallback)
+    encode zstd gzip
+
+    # Block root path - redirect (optional, remove if not needed)
+    handle / {
+        redir https://www.youtube.com/watch?v=dQw4w9WgXcQ 307
+    }
+
+    # Assets - explicitly handle for subscription page
+    handle /assets/* {
+        reverse_proxy remnawave-subscription-page:{$SUB_PORT} {
+            header_up X-Real-IP {remote_host}
+            header_up Host {host}
+        }
+    }
+
+    # All other subscription paths
+    handle {
+        reverse_proxy remnawave-subscription-page:{$SUB_PORT} {
+            header_up X-Real-IP {remote_host}
+            header_up Host {host}
+        }
+    }
+
+    log {
+        output file /var/log/caddy/sub.log {
+            roll_size 30mb
+            roll_keep 10
+            roll_keep_for 720h
+        }
+    }
+}
+
+# Proxy domain - Xray inbounds (VLESS WS, VLESS gRPC, Trojan WS, Trojan gRPC)
+https://{$PROXY_DOMAIN} {
+    encode zstd gzip
+
+    # VLESS WebSocket
+    @vless-ws {
+        path /vless-ws*
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    handle @vless-ws {
+        reverse_proxy remnawave-xray:2021 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+        }
+    }
+
+    # VLESS gRPC
+    @vless-grpc {
+        path /vless-grpc*
+        header Content-Type application/grpc*
+    }
+    handle @vless-grpc {
+        reverse_proxy remnawave-xray:2022 {
+            transport http {
+                versions h2c
+            }
+            flush_interval -1
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+        }
+    }
+
+    # Trojan WebSocket
+    @trojan-ws {
+        path /trojan-ws*
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    handle @trojan-ws {
+        reverse_proxy remnawave-xray:2023 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+        }
+    }
+
+    # Trojan gRPC
+    @trojan-grpc {
+        path /trojan-grpc*
+        header Content-Type application/grpc*
+    }
+    handle @trojan-grpc {
+        reverse_proxy remnawave-xray:2024 {
+            transport http {
+                versions h2c
+            }
+            flush_interval -1
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+        }
+    }
+
+    # Fallback - serve remnawave panel
+    handle {
+        reverse_proxy remnawave:{$PANEL_PORT} {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+        }
+    }
+
+    log {
+        output file /var/log/caddy/proxy.log {
+            roll_size 30mb
+            roll_keep 10
+            roll_keep_for 720h
+        }
+    }
+}
+
+# Fallback for any other HTTPS requests
+:443 {
+    tls internal
+    respond 204
+}
