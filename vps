@@ -13,7 +13,36 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
+
+print_banner() {
+    clear
+    echo -e "${GREEN}"
+    echo "  ███████╗██╗███╗   ██╗ ██████╗       ██████╗  ██████╗ ██╗  ██╗"
+    echo "  ██╔════╝██║████╗  ██║██╔════╝       ██╔══██╗██╔═══██╗╚██╗██╔╝"
+    echo "  ███████╗██║██╔██╗ ██║██║  ███╗█████╗██████╔╝██║   ██║ ╚███╔╝ "
+    echo "  ╚════██║██║██║╚██╗██║██║   ██║╚════╝██╔══██╗██║   ██║ ██╔██╗ "
+    echo "  ███████║██║██║ ╚████║╚██████╔╝      ██████╔╝╚██████╔╝██╔╝ ██╗"
+    echo "  ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝       ╚═════╝  ╚═════╝ ╚═╝  ╚═╝"
+    echo -e "${NC}"
+    local mem_free mem_total cpu_usage _sep
+    mem_free=$(free -m | awk '/^Mem:/{print $4}')
+    mem_total=$(free -m | awk '/^Mem:/{print $2}')
+    cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2+$4}')
+    _sep=$(printf '═%.0s' $(seq 1 58))
+    _row() { printf "${CYAN}  ║${NC}  %-56s${CYAN}║${NC}\n" "$1"; }
+    echo -e "${CYAN}  ╔${_sep}╗${NC}"
+    _row "DATE   : $(date '+%Y-%m-%d %H:%M:%S')"
+    _row "HOST   : $(hostname)"
+    _row "UPTIME : $(uptime -p)"
+    echo -e "${CYAN}  ╠${_sep}╣${NC}"
+    _row "CPU    : ${cpu_usage}%"
+    _row "MEM    : FREE ${mem_free}MB / ${mem_total}MB"
+    echo -e "${CYAN}  ╚${_sep}╝${NC}"
+}
 
 DOMAIN=$(grep "server_name" $NGINX_CONF 2>/dev/null | awk '{print $2}' | sed 's/;//')
 
@@ -135,71 +164,106 @@ EOF
     echo -e "${GREEN}Instalasi Selesai!${NC}"
 }
 
+user_management() {
+    while true; do
+        print_banner
+        sub_files
+        echo -e "${GREEN}  ╔══════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}  ║         ${BOLD}${CYAN}[ USER MANAGEMENT ]${NC}${GREEN}              ║${NC}"
+        echo -e "${GREEN}  ╠══════════════════════════════════════════╣${NC}"
+
+        now=$(date +%s)
+        user_count=0
+        while IFS= read -r user; do
+            uname=$(echo "$user" | jq -r '.name')
+            uexp=$(grep "^$uname:" "$EXPIRY_FILE" 2>/dev/null | cut -d: -f2)
+            [[ -z "$uexp" ]] && uexp=0
+            if [[ "$uexp" == "0" ]]; then
+                exp_label="${GREEN}unlimited${NC}"
+            elif [[ "$now" -gt "$uexp" ]]; then
+                exp_label="${RED}expired${NC}"
+            else
+                exp_label="${YELLOW}$(date -d @$uexp +%Y-%m-%d)${NC}"
+            fi
+            echo -e "${GREEN}  ║  ${PURPLE}◆${NC} ${BOLD}$uname${NC} ${DIM}│${NC} exp: $exp_label"
+            echo -e "${GREEN}  ║    ${DIM}↳ https://$DOMAIN/sub/$uname${NC}"
+            user_count=$((user_count + 1))
+        done < <(jq -c '.inbounds[] | select(.tag=="vless-ws") | .users[]' "$CONFIG_FILE" 2>/dev/null)
+
+        [[ "$user_count" -eq 0 ]] && echo -e "${GREEN}  ║  ${DIM}(no users)${NC}"
+        echo -e "${GREEN}  ╠══════════════════════════════════════════╣${NC}"
+        echo -e "${GREEN}  ║  ${YELLOW}[a]${NC} ADD USER                            ${GREEN}║${NC}"
+        echo -e "${GREEN}  ║  ${RED}[r]${NC} REMOVE USER                         ${GREEN}║${NC}"
+        echo -e "${GREEN}  ║  ${DIM}[q] BACK${NC}                                 ${GREEN}║${NC}"
+        echo -e "${GREEN}  ╚══════════════════════════════════════════╝${NC}"
+        echo -e "${DIM}${GREEN}  root@$(hostname):/users# ${NC}\c"; read -r UOPT
+
+        case $UOPT in
+            a|A)
+                echo -e "${GREEN}  ╔══════════════════════════════════════════╗${NC}"
+                echo -e "${GREEN}  ║         ${YELLOW}[ CREATE NEW USER ]${NC}${GREEN}              ║${NC}"
+                echo -e "${GREEN}  ╚══════════════════════════════════════════╝${NC}"
+                echo -ne "${DIM}${GREEN}  Username    : ${NC}"; read -r UNAME
+                echo -ne "${DIM}${GREEN}  Active Days : ${NC}(0=unlimited) "; read -r DAYS
+                [[ "$DAYS" == "0" ]] && EXP=0 || EXP=$(date -d "+$DAYS days" +%s)
+                UUID=$(cat /proc/sys/kernel/random/uuid); PASS=$(openssl rand -hex 6)
+                tags=("vless-ws" "vless-grpc" "vless-upgrade" "trojan-ws" "trojan-grpc" "trojan-upgrade")
+                for tag in "${tags[@]}"; do
+                    if [[ $tag == vless* ]]; then
+                        jq --arg n "$UNAME" --arg id "$UUID" --arg t "$tag" '(.inbounds[] | select(.tag==$t) | .users) += [{"name":$n, "uuid":$id}]' "$CONFIG_FILE" > /tmp/sb.j && mv /tmp/sb.j "$CONFIG_FILE"
+                    else
+                        jq --arg n "$UNAME" --arg p "$PASS" --arg t "$tag" '(.inbounds[] | select(.tag==$t) | .users) += [{"name":$n, "password":$p}]' "$CONFIG_FILE" > /tmp/sb.j && mv /tmp/sb.j "$CONFIG_FILE"
+                    fi
+                done
+                sed -i "/^$UNAME:/d" "$EXPIRY_FILE" 2>/dev/null; echo "$UNAME:$EXP" >> "$EXPIRY_FILE"
+                sub_files && docker restart sing-box
+                echo -e "${GREEN}  [+] USER DEPLOYED SUCCESSFULLY${NC}"; sleep 1 ;;
+            r|R)
+                echo -e "${RED}  ╔══════════════════════════════════════════╗${NC}"
+                echo -e "${RED}  ║         ${BOLD}[ TERMINATE USER ]${NC}${RED}               ║${NC}"
+                echo -e "${RED}  ╚══════════════════════════════════════════╝${NC}"
+                echo -ne "${DIM}${RED}  Target Username : ${NC}"; read -r D_NAME
+                jq --arg n "$D_NAME" '.inbounds[].users |= map(select(.name != $n))' "$CONFIG_FILE" > /tmp/sb.j && mv /tmp/sb.j "$CONFIG_FILE"
+                sed -i "/^$D_NAME:/d" "$EXPIRY_FILE" 2>/dev/null
+                sub_files && docker restart sing-box
+                echo -e "${RED}  [-] USER TERMINATED${NC}"; sleep 1 ;;
+            q|Q) break ;;
+        esac
+    done
+}
+
 while true; do
-    clear
+    print_banner
     if ! check_installation; then
-        echo -e "${RED}Sing-box Belum Terinstall.${NC}"
-        read -p "Install sekarang? (y/n): " I_CONFIRM
+        echo -e "${RED}  [!] SYSTEM NOT INITIALIZED — SING-BOX NOT FOUND${NC}"
+        echo -e "${DIM}${GREEN}  ┌─────────────────────────────────────┐${NC}"
+        echo -ne "${DIM}${GREEN}  │  Initialize system now? [y/n]: ${NC}"; read -r I_CONFIRM
+        echo -e "${DIM}${GREEN}  └─────────────────────────────────────┘${NC}"
         [[ "$I_CONFIRM" == "y" ]] && install_process || exit
         DOMAIN=$(grep "server_name" $NGINX_CONF 2>/dev/null | awk '{print $2}' | sed 's/;//')
     fi
 
-    echo -e "${BLUE}      SING-BOX MANAGER ($DOMAIN)      ${NC}"
-    echo -e "1) ${GREEN}Daftar User & Sub Link${NC}"
-    echo -e "2) ${YELLOW}Tambah User (Full 6 Protocol)${NC}"
-    echo -e "3) ${RED}Hapus User${NC}"
-    echo -e "4) ${BLUE}Status Core${NC}"
-    echo -e "5) ${RED}Wipe & Reset (Keep SSL)${NC}"
-    echo -e "6) Keluar"
-    read -p "Pilihan: " OPT
-    
-    case $OPT in
-        1) 
-           sub_files
-           echo -e "\n${BLUE}========== USER LIST ==========${NC}"
-           now=$(date +%s)
-           jq -c '.inbounds[] | select(.tag=="vless-ws") | .users[]' "$CONFIG_FILE" 2>/dev/null | while read -r user; do
-               uname=$(echo "$user" | jq -r '.name')
-               uexp=$(grep "^$uname:" "$EXPIRY_FILE" 2>/dev/null | cut -d: -f2)
-               [[ -z "$uexp" ]] && uexp=0
-               
-               if [[ "$uexp" == "0" ]]; then
-                   expire_status="${GREEN}Unlimited${NC}"
-               elif [[ "$now" -gt "$uexp" ]]; then
-                   expire_status="${RED}Expired ($(date -d @$uexp +%Y-%m-%d))${NC}"
-               else
-                   expire_status="${YELLOW}$(date -d @$uexp +%Y-%m-%d)${NC}"
-               fi
+    echo -e "${GREEN}  ╔══════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}  ║  ${BOLD}${CYAN}TARGET${NC}${GREEN} : ${YELLOW}$DOMAIN${GREEN}$(printf '%*s' $((25 - ${#DOMAIN})) '')║${NC}"
+    echo -e "${GREEN}  ╠══════════════════════════════════════════╣${NC}"
+    echo -e "${GREEN}  ║  ${CYAN}[1]${NC} USER MANAGEMENT                     ${GREEN}║${NC}"
+    echo -e "${GREEN}  ║  ${CYAN}[2]${NC} CORE STATUS                         ${GREEN}║${NC}"
+    echo -e "${GREEN}  ║  ${RED}[3]${NC} WIPE & RESET (KEEP SSL)              ${GREEN}║${NC}"
+    echo -e "${GREEN}  ║  ${DIM}[4] EXIT${NC}                                 ${GREEN}║${NC}"
+    echo -e "${GREEN}  ╚══════════════════════════════════════════╝${NC}"
+    echo -e "${DIM}${GREEN}  root@$(hostname):/# ${NC}\c"; read -r OPT
 
-               echo -e "${PURPLE}User:${NC} $uname | ${PURPLE}Exp:${NC} $expire_status"
-               echo -e "${YELLOW}Sub:${NC} https://$DOMAIN/sub/$uname"
-               echo "------------------------------------------------------------"
-           done
-           read -p "Enter untuk kembali..." ;;
-        2) 
-           read -p "Nama User: " UNAME; read -p "Masa Aktif (hari, 0=unlimit): " DAYS
-           [[ "$DAYS" == "0" ]] && EXP=0 || EXP=$(date -d "+$DAYS days" +%s)
-           UUID=$(cat /proc/sys/kernel/random/uuid); PASS=$(openssl rand -hex 6)
-           tags=("vless-ws" "vless-grpc" "vless-upgrade" "trojan-ws" "trojan-grpc" "trojan-upgrade")
-           for tag in "${tags[@]}"; do
-               if [[ $tag == vless* ]]; then 
-                   jq --arg n "$UNAME" --arg id "$UUID" --arg t "$tag" '(.inbounds[] | select(.tag==$t) | .users) += [{"name":$n, "uuid":$id}]' "$CONFIG_FILE" > /tmp/sb.j && mv /tmp/sb.j "$CONFIG_FILE"
-               else 
-                   jq --arg n "$UNAME" --arg p "$PASS" --arg t "$tag" '(.inbounds[] | select(.tag==$t) | .users) += [{"name":$n, "password":$p}]' "$CONFIG_FILE" > /tmp/sb.j && mv /tmp/sb.j "$CONFIG_FILE"
-               fi
-           done
-           sed -i "/^$UNAME:/d" "$EXPIRY_FILE" 2>/dev/null; echo "$UNAME:$EXP" >> "$EXPIRY_FILE"
-           sub_files && docker restart sing-box; echo -e "${GREEN}User Berhasil Dibuat!${NC}"; sleep 1 ;;
-        3) 
-           read -p "Hapus Nama User: " D_NAME
-           jq --arg n "$D_NAME" '.inbounds[].users |= map(select(.name != $n))' "$CONFIG_FILE" > /tmp/sb.j && mv /tmp/sb.j "$CONFIG_FILE"
-           sed -i "/^$D_NAME:/d" "$EXPIRY_FILE" 2>/dev/null
-           sub_files && docker restart sing-box; echo "User dihapus."; sleep 1 ;;
-        4) 
-           docker stats --no-stream sing-box nginx; read -p "Enter untuk kembali..." ;;
-        5) 
-           wipe_system ;;
-        6) 
+    case $OPT in
+        1) user_management ;;
+        2)
+           echo -e "${CYAN}  ╔══════════════════════════════════════════╗${NC}"
+           echo -e "${CYAN}  ║         ${BOLD}[ SYSTEM CORE STATUS ]${NC}${CYAN}           ║${NC}"
+           echo -e "${CYAN}  ╚══════════════════════════════════════════╝${NC}"
+           docker stats --no-stream sing-box nginx
+           read -p $'\n  [>] Press ENTER to return...' ;;
+        3) wipe_system ;;
+        4)
+           echo -e "${DIM}${GREEN}  [!] Connection terminated.${NC}"
            exit ;;
     esac
 done
