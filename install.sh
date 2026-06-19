@@ -1,216 +1,122 @@
 #!/bin/bash
 
-set -e
-# Ensure running as root
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root (e.g., with sudo su)" >&2
-  exit 1
-fi
-# Define the domain for your marzban instance
-read -p "Enter your domain for marzban: " DOMAIN
-read -p "Enter your email for SSL certificate (inibudi@daouse.com): " MAIL
+echo "========================"
+echo "   VLESS Reality Xray   "
+echo "========================"
 
+# Prompt user for Domain or IP
+read -p "Enter your Domain or VPS IP : " DOMAIN
 
-# Update the system and install necessary packages
-apt update -qq -y
-apt install curl wget git ufw gnupg2 lsb-release socat tree idn net-tools vnstat iptables xz-utils apt-transport-https dnsutils cron bash-completion -y
-
-# Install speedtest
-echo "Checking for existing speedtest installation..."
-if command -v speedtest >/dev/null 2>&1; then
-    echo "speedtest is already installed. Skipping installation."
-else
-    echo "Installing speedtest..."
-    wget -q https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-x86_64.tgz > /dev/null 2>&1
-    tar xzf ookla-speedtest-1.2.0-linux-x86_64.tgz > /dev/null 2>&1
-    mv speedtest /usr/bin/
-    rm -f ookla-* speedtest.* > /dev/null 2>&1
+# Validation: Ensure input is not empty
+if [ -z "$DOMAIN" ]; then
+    echo "ERROR: Domain/IP cannot be empty! Aborted."
+    exit 1
 fi
 
-# Enable BBR
-echo "Enabling BBR congestion control..."
-modprobe tcp_bbr >/dev/null 2>&1
-echo "tcp_bbr" | tee -a /etc/modules-load.d/modules.conf
-sysctl -w net.core.default_qdisc=fq
-sysctl -w net.ipv4.tcp_congestion_control=bbr
-if sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
-  echo "BBR has been enabled."
-else
-  echo "Failed to enable BBR."
+echo "-> Stopping Xray service..."
+systemctl stop xray
+
+echo "-> Generating New X25519 Keys..."
+# Save output to temporary files to ensure accuracy
+/usr/local/bin/xray uuid > /tmp/xray_uuid.txt 2>&1
+/usr/local/bin/xray x25519 > /tmp/xray_keys.txt 2>&1
+
+# Extract and remove all spaces/newlines/carriage returns
+UUID=$(cat /tmp/xray_uuid.txt | tr -d ' ' | tr -d '\r' | tr -d '\n')
+PRIV_KEY=$(grep -i "Private" /tmp/xray_keys.txt | awk -F ':' '{print $2}' | tr -d ' ' | tr -d '\r')
+PUB_KEY=$(grep -i "Public" /tmp/xray_keys.txt | awk -F ':' '{print $2}' | tr -d ' ' | tr -d '\r')
+SHORT_ID=$(openssl rand -hex 8)
+
+# Strict validation
+if [ -z "$PRIV_KEY" ] || [ -z "$PUB_KEY" ]; then
+    echo "==================================================="
+    echo "CRITICAL ERROR: Xray failed to generate keys!"
+    echo "Here is the raw log showing the exact cause:"
+    cat /tmp/xray_keys.txt
+    echo "==================================================="
+    exit 1
 fi
 
-sysctl -w net.mptcp.enabled=1
-if sysctl net.mptcp.enabled | grep -q "net.mptcp.enabled = 1"; then
-  echo "MPTCP has been enabled."
-else
-  echo "Failed to enable MPTCP."
-fi
+echo "-> Inserting Private Key into config.json..."
+cat <<EOF > /usr/local/etc/xray/config.json
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "$UUID",
+            "flow": "xtls-rprx-vision"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "www.apple.com:443",
+          "xver": 0,
+          "serverNames": [
+            "www.apple.com"
+          ],
+          "privateKey": "$PRIV_KEY",
+          "shortIds": [
+            "$SHORT_ID"
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "block"
+    }
+  ]
+}
+EOF
 
-sysctl -p >/dev/null 2>&1
+echo "-> Restarting Xray Server..."
+systemctl start xray
+systemctl enable xray &> /dev/null
 
-if command -v marzban >/dev/null 2>&1; then
-  echo "Existing marzban installation detected. Uninstalling..."
-  marzban uninstall
-fi
-
-bash -c "$(curl -sL https://github.com/nationpwned/vps/raw/refs/heads/marzban/marzban)" @ install
-sleep 50
-
-marzban cli admin create --sudo
-
-[ -f /$HOME/reality.txt ] && rm -f /$HOME/reality.txt
-[ -f /$HOME/shortIds.txt ] && rm -f /$HOME/shortIds.txt
-[ -f /$HOME/xray_uuid.txt ] && rm -f /$HOME/xray_uuid.txt
-
-# Generate Reality keys
-echo "Generating Reality keys..."
-docker exec marzban-marzban-1 xray x25519 genkey > /$HOME/reality.txt
-PRIVATE_KEY=$(grep -oP 'Private key: \K\S+' /$HOME/reality.txt)
-PUBLIC_KEY=$(grep -oP 'Public key: \K\S+' /$HOME/reality.txt)
-
-# Generate shortIds
-echo "Generating shortIds..."
-openssl rand -hex 8 > /$HOME/shortIds.txt
-SHORTIDS=$(cat /$HOME/shortIds.txt)
-
-# Generating uuid for Reality
-echo "Generating UUID for Reality..."
-if ! docker ps | grep -q marzban-marzban-1; then
-  echo "marzban container not running! Exiting."
-  exit 1
-fi
-docker exec marzban-marzban-1 xray uuid > /$HOME/xray_uuid.txt
-XRAY_UUID=$(cat /$HOME/xray_uuid.txt)
-if [[ -z "$XRAY_UUID" ]]; then
-  echo "Failed to generate UUID. Exiting."
-  exit 1
-fi
-
-# Check if certificate already exists
-rm -Rf /var/lib/marzban/certs >/dev/null 2>&1 || true
-if [[ -f "/var/lib/marzban/certs/fullchain.pem" && -f "/var/lib/marzban/certs/key.pem" ]]; then
-    echo "SSL certificate already exists. Skipping certificate installation."
-else
-    # Install Certificate using acme.sh
-    bash -c "curl https://get.acme.sh | sh -s email=$MAIL"
-    mkdir -p /var/lib/marzban/certs
-    bash -c "~/.acme.sh/acme.sh --issue --force --standalone -d \"$DOMAIN\" --fullchain-file \"/var/lib/marzban/certs/fullchain.pem\" --key-file \"/var/lib/marzban/certs/key.pem\""
-    marzban down
-
-    # Set proper permissions
-    chmod 600 "/var/lib/marzban/certs/key.pem"
-    chmod 644 "/var/lib/marzban/certs/fullchain.pem"
-fi
-
-wget -O /opt/marzban/.env https://github.com/nationpwned/vps/raw/refs/heads/marzban/env
-# Download docker-compose.yml
-wget -O /opt/marzban/docker-compose.yml https://github.com/nationpwned/vps/raw/refs/heads/marzban/docker-compose.yml
-
-# Download nginx.conf
-wget -O /opt/marzban/nginx.conf https://github.com/nationpwned/vps/raw/refs/heads/marzban/nginx.conf
-# Replace placeholders in nginx.conf with user input
-sed -i "s/server_name \$DOMAIN;/server_name $DOMAIN;/" /opt/marzban/nginx.conf
-
-# Download xray_config.json
-wget -O /var/lib/marzban/xray_config.json https://github.com/nationpwned/vps/raw/refs/heads/marzban/xray_config.json
-
-sed -i "s/YOUR_UUID/$XRAY_UUID/" /var/lib/marzban/xray_config.json
-
-# Download the subscribers marzban
-mkdir -p /var/lib/marzban/templates/subscription/
-wget -N -P /var/lib/marzban/templates/subscription/ https://github.com/nationpwned/vps/raw/refs/heads/marzban/index.html
-
-# Firewall configuration
-echo "Configuring firewall..."
-ufw allow 8000/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw allow 8443/tcp
-ufw allow 8444/tcp
-ufw allow 8445/tcp
-ufw allow 8446/tcp
-ufw allow 8447/tcp
-ufw allow 8448/tcp
-ufw allow 9443/tcp
-ufw allow 10443/tcp
-ufw allow 22/tcp
-ufw allow 2222/tcp
-ufw allow 2021/tcp
-ufw allow 2022/tcp
-ufw allow 2023/tcp
-ufw allow 2024/tcp
-ufw allow 2025/tcp
-ufw allow 51820/tcp
-ufw allow 51821/tcp
-ufw allow 51822/tcp
-ufw allow 51823/tcp
-ufw allow 51824/tcp
-ufw allow 51825/tcp
-ufw allow 8443/tcp
-ufw allow 9443/tcp
-ufw allow 62050/tcp
-ufw allow 62051/tcp
-
-ufw --force enable
-
-# Cloudflare Warp installation
-echo "Installing Cloudflare Warp..."
-docker compose -f /opt/marzban/docker-compose.yml up -d
-
-# Ensure /opt/marzban/wgcf directory is fresh
-if [ -d /opt/marzban/wgcf ]; then
-  rm -rf /opt/marzban/wgcf
-fi
-mkdir -p /opt/marzban/wgcf
-
-# Download wgcf binary
-WGCF_LATEST_URL=$(curl -s https://api.github.com/repos/ViRb3/wgcf/releases/latest | grep "browser_download_url" | grep "linux_amd64" | cut -d '"' -f 4)
-wget "$WGCF_LATEST_URL" -O /usr/local/bin/wgcf
-
-chmod +x /usr/local/bin/wgcf
-# Configure Cloudflare Warp
-echo "Configuring Cloudflare Warp..."
-wgcf register --accept-tos || true > /dev/null 2>&1
-wgcf generate
-mv wgcf-profile.conf /opt/marzban/wgcf/wg0.conf
-mv wgcf-account.toml /opt/marzban/wgcf/
-sed -i -E 's/, [0-9a-f:]+\/128//; s/, ::\/0//' /opt/marzban/wgcf/wg0.conf
-sleep 3
-docker restart wgcf-warp
-sleep 5
-
+echo ""
 echo "==============================================="
-# Check Cloudflare Warp status (Cloudflare and ip-api.com)
-if docker exec wgcf-warp curl -s https://www.cloudflare.com/cdn-cgi/trace | grep -q "warp=on"; then
-    echo "Cloudflare Warp is ON (Cloudflare trace)."
-else
-    echo "Cloudflare Warp is OFF (Cloudflare trace)."
-fi
-
-if docker exec wgcf-warp curl -s http://ip-api.com/json | grep -q 'Cloudflare WARP'; then
-    echo "Cloudflare Warp is ON (ip-api.com check)."
-else
-    echo "Cloudflare Warp is OFF or not detected by ip-api.com."
-fi
-
+echo "        XRAY SERVER IS BACK TO NORMAL!         "
 echo "==============================================="
-echo "private key: $PRIVATE_KEY"
-echo "public key: $PUBLIC_KEY"
-echo "ShortIds: $SHORTIDS"
-echo "UUID: $XRAY_UUID"
+echo " Xray Status :" $(systemctl is-active xray)
+echo "==============================================="
+echo " Copy the text below into your Mihomo app:"
+echo "==============================================="
+cat <<EOF
+proxies:
+  - name: VLESS-Reality-Auto
+    type: vless
+    server: $DOMAIN
+    port: 443
+    uuid: $UUID
+    network: tcp
+    tls: true
+    udp: true
+    flow: xtls-rprx-vision
+    servername: www.apple.com
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: "$PUB_KEY"
+      short-id: "$SHORT_ID"
+EOF
 echo "==============================================="
 
-echo "marzban installation and configuration completed successfully!"
-echo "You can access marzban at https://$DOMAIN"
-echo "Make sure to configure your Xray clients with the provided Reality keys and UUID."
-echo "==============================================="
-
-
-read -p "Do you want to reboot now? [Y/n]: " answer
-answer=${answer:-Y}
-if [[ "$answer" =~ ^[Yy]$ ]]; then
-  echo "Rebooting system..."
-  reboot
-else
-  echo "Reboot cancelled. Please reboot manually if needed."
-fi
+rm -f /tmp/xray_keys.txt /tmp/xray_uuid.txt
