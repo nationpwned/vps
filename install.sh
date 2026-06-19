@@ -43,6 +43,12 @@ cat <<EOF > /usr/local/etc/xray/config.json
   "log": {
     "loglevel": "warning"
   },
+  "dns": {
+    "servers": [
+      "1.1.1.1",
+      "1.0.0.1"
+    ]
+  },
   "inbounds": [
     {
       "listen": "0.0.0.0",
@@ -72,6 +78,15 @@ cat <<EOF > /usr/local/etc/xray/config.json
             "$SHORT_ID"
           ]
         }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ],
+        "routeOnly": true
       }
     }
   ],
