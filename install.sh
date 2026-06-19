@@ -57,7 +57,7 @@ cat <<EOF > /usr/local/etc/xray/config.json
       "settings": {
         "clients": [
           {
-            "id": "a449f835-5387-453c-b7a9-b546157c5fae",
+            "id": "$UUID",
             "flow": "xtls-rprx-vision"
           }
         ],
@@ -73,9 +73,9 @@ cat <<EOF > /usr/local/etc/xray/config.json
           "serverNames": [
             "www.apple.com"
           ],
-          "privateKey": "mKn8wcLm-yRxQ9V-UXhKq49pk_1WZa7c5kdEivm3qnc",
+          "privateKey": "$PRIV_KEY",
           "shortIds": [
-            "162b080e2de7be33"
+            "$SHORT_ID"
           ]
         }
       },
