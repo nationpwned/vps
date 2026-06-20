@@ -1,1 +1,1 @@
-https://edgetunnel.nationpwned.workers.dev/$"UUID"
+https://edgetunnel.xxx.workers.dev/$"UUID"
