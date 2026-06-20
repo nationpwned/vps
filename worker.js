@@ -4943,7 +4943,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 		HOST: host,
 		HOSTS: [hostname],
 		UUID: userID,
-		PATH: "/",
+		PATH: "/vless",
 		协议类型: "v" + "le" + "ss",
 		传输协议: "ws",
 		gRPC模式: "gun",
