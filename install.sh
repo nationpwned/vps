@@ -122,11 +122,11 @@ cat >/etc/sing-box/config.json <<EOF
       ],
       "tls": {
         "enabled": true,
-        "server_name": "www.cloudflare.com",
+        "server_name": "www.apple.com",
         "reality": {
           "enabled": true,
           "handshake": {
-            "server": "www.cloudflare.com",
+            "server": "www.apple.com",
             "server_port": 443
           },
           "private_key": "$PRIVATE_KEY",
@@ -184,7 +184,7 @@ proxies:
     network: tcp
     udp: true
     tls: true
-    servername: www.microsoft.com
+    servername: www.apple.com
     flow: xtls-rprx-vision
     client-fingerprint: chrome
     reality-opts:
