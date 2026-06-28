@@ -139,7 +139,8 @@ cat >/etc/sing-box/config.json <<EOF
   ],
   "outbounds": [
     {
-      "type": "direct"
+      "type": "direct",
+      "domain_strategy": "prefer_ipv4"
     }
   ]
 }
