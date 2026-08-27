@@ -1,0 +1,11 @@
+name = "edgetunnel"
+main = "_worker.js"
+compatibility_date = "2024-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ADMIN = "inibudi"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "26c8e2f8511b408a91a01dd5b5a379c6"
