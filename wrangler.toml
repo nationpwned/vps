@@ -4,7 +4,7 @@ compatibility_date = "2024-08-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-ADMIN = "inibudi"
+ADMIN = "iniibubudi"
 
 [[kv_namespaces]]
 binding = "KV"
